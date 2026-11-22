@@ -2,7 +2,7 @@
 
 ## SDK-WEB-01 — Foundation and contracts
 
-**Status:** Implemented and validated locally. The changes are in the existing `Tot-Taylor/SudokuApp-Web` working tree and are uncommitted.
+**Status:** Implemented and validated locally.
 
 - Initialized a React, TypeScript and Vite app shell with Node.js 24, pinned npm dependencies, strict type checking, ESLint, and the GitHub Actions check workflow.
 - Defined versioned, runtime-validated schemas for game snapshots, shared state, stats, mutations, receipts and API errors. Documented the active game, timer, completion deduplication, server order, offline journal and database restore rules. [Contracts](../docs/contracts.md)
@@ -10,7 +10,7 @@
 
 ## SDK-WEB-02 — Sudoku engine
 
-**Status:** Implemented and validated locally. Ticket 01 and 02 changes are uncommitted.
+**Status:** Implemented and validated locally.
 
 - Added a local solver, solution counting, naked and hidden singles checks, and deterministic seeded generation for all four difficulty tiers. A cancellable browser worker handles generation. Requests have attempt and search limits so the UI can offer a retry. [Generator](../src/engine/generator.ts) · [Worker client](../src/engine/generate-in-worker.ts)
 - Added start and restore, editable-cell selection, placement, erase, foreground timing and a single completion result. Restore validates the snapshot, puzzle difficulty and unique solution. A completed board is read-only. [Game session](../src/engine/game.ts)
@@ -21,7 +21,7 @@
 
 ## SDK-WEB-03 — Mobile web interface
 
-**Status:** Implemented and validated locally. The changes for Tickets 01 through 03 are uncommitted.
+**Status:** Implemented and validated locally.
 
 - Added Home, four difficulty choices, replacement confirmation, a playable game screen, completion dialog with solve time, Statistics, Settings and the Shop placeholder. The web layout uses the SwiftUI palette, heart placeholders, selected row and column, and 3×3 borders. [UI entry](../src/ui/App.tsx) · [Parity inventory](../docs/native-parity.md)
 - Wired touch and keyboard controls to a labeled grid with roving focus. Digits enter values, arrows move across the grid, and Delete or Backspace erases. The game clock checkpoints only while the board is open and focused.
@@ -31,7 +31,7 @@
 
 ## SDK-WEB-04 — Shared persistence and offline synchronization
 
-**Status:** Implemented and validated on loopback. Tickets 01 through 04 are local and uncommitted.
+**Status:** Implemented and validated on loopback.
 
 - Added a same-origin Node HTTP server and SQLite database for one shared active puzzle and completion history. Transactions assign server revisions, validate immutable puzzle definitions, and store operation receipts. The latest accepted write wins and each solved UUID contributes to stats once. [Server](../server/app.ts) · [Database](../server/database.ts)
 - Replaced preview writes with a transactional IndexedDB journal. The connected app retries queued moves with their original IDs, syncs on foreground reconnect, coordinates tabs, and shows saving, offline, pending, and acknowledged states. It imports Ticket 03 data once on the same origin. [Sync client](../src/sync/client.ts) · [Storage and wire contract](../docs/contracts.md)
@@ -41,7 +41,7 @@
 
 ## SDK-WEB-05 — Installable iPhone PWA
 
-**Status:** Implemented and verified on loopback. Physical iPhone acceptance is pending on the private HTTPS origin. Tickets 01 through 05 are local and uncommitted.
+**Status:** Implemented and verified in automated browser tests. The owner confirmed that iPhone setup over private HTTPS worked.
 
 - Added the stable standalone Sudoku manifest and a rose grid icon based on the app wordmark. The build serves 192 px and 512 px manifest icons and a dedicated 180 px Apple touch icon. [Manifest](../public/manifest.webmanifest)
 - Added a content-versioned service worker that installs the app shell, compiled assets and puzzle worker as a complete set. API traffic stays live and queued moves stay in IndexedDB. A waiting update leaves the current game open until its windows close. [Build plugin](../src/pwa/build.ts) · [Worker](../src/pwa/service-worker.js)
@@ -51,7 +51,7 @@
 
 ## SDK-WEB-06 — Deployment preparation
 
-**Status:** Local preparation, rehearsal, and the authorized read-only `pve2` preflight are complete. The implementation is local and uncommitted. Host provisioning and release activation remain pending.
+**Status:** Release `e1ae67cd7dd9` is running on CT 103 over private Tailscale HTTPS. The owner confirmed that the iPhone setup worked. Off-guest backup storage is pending.
 
 - Added a clean-checkout release builder that records the reviewed Git commit, packages the connected PWA and server, and emits a SHA-256 sidecar. The rehearsal option is marked `deployable: false`. Verified that a dirty checkout cannot produce a deployable archive and an existing release ID cannot be overwritten. [Release builder](../deploy/stage-release.ts)
 - Added the dedicated systemd service, environment example, backup service, and daily timer. The proposed loopback port is 4174, with the database under `/var/lib/sudokuapp-web` and versioned releases under `/opt/sudokuapp-web`. The backup runs at 08:30 UTC and keeps the newest 30 verified daily snapshots. Manual backup files are kept for rollback and managed separately. [Proxmox runbook](../docs/proxmox-deployment.md)
@@ -60,7 +60,17 @@
 - Verified the SHA-256 sidecars and runtime contents for the `local-check-ticket06-first` and `local-check-ticket06-candidate` archives under `releases/`. Installed production dependencies, served both packages on Windows loopback, backed up a live synthetic database, and restored it into an isolated new history. Switching to the candidate and back preserved a newly accepted move, completion totals, and idempotent receipts.
 - On November 22, 2026, the Proxmox console confirmed ID 103 was free on `pve2`. The x86-64 host had 4 CPUs and about 9.9 GiB of available RAM. `local-lvm` supported container volumes with about 1,355 GiB free. `local` had about 82 GiB free and contained `debian-13-standard_13.6-1_amd64.tar.zst`.
 - The `vmbr0` bridge was up and carried the host's default route. Fry-By CT 102 used DHCP on that bridge. `/dev/net/tun` was present and the host resolved `pkgs.tailscale.com`. Fry-By was running, `fry-by.service` was active, `/healthz` returned `{"status":"ok"}`, and Tailscale Serve reported tailnet-only HTTPS to `127.0.0.1:4173`.
-- Proxmox showed zero scheduled backup jobs and only the `local` and `local-lvm` storage definitions. An approved off-guest backup destination still needs to be selected. Guest validation still includes systemd, private HTTPS and its access policy, reboot persistence, scheduled backups and restore, and physical iPhone installation. Recheck Fry-By against the baseline after release activation.
+- Proxmox showed zero scheduled backup jobs and only the `local` and `local-lvm` storage definitions. An approved off-guest backup destination still needs to be selected.
+
+### First deployment on pve2
+
+- Provisioned unprivileged Debian 13 amd64 LXC `103` with hostname `sudokuapp-web`, 1 vCPU, 1 GiB RAM, 8 GiB on `local-lvm`, DHCP on `vmbr0`, and on-boot startup. Passed through `/dev/net/tun` and enabled `keyctl` and nesting for this guest. Installed Node.js `24.22.3` from the published release with SHA-256 verification and Tailscale `1.104.7` from its Debian repository.
+- Built release `e1ae67cd7dd9` from commit `e1ae67cd7dd9e1206e7022a8d77f8526020a544e`. Transferred the archive through the Proxmox ISO uploader and verified `0682ed7d2ecf139753aafcc8abde2ae493a11d93c3964deee8120fea533cedbd` on the host and guest. The production release check passed 32 Node tests and 36 Chromium and WebKit browser tests.
+- Installed and enabled `sudokuapp-web.service` under its own system account. Only `127.0.0.1:4174` listens for the app. The database is `/var/lib/sudokuapp-web/sudoku.sqlite`. The configured origin matches the private hostname for `sudokuapp-web` in Tailscale Machines.
+- Enabled the daily backup timer at 08:30 UTC. Verified `/var/backups/sudokuapp-web/sudoku-daily-2026-11-22.sqlite` and restored it to an isolated file with a new history ID and matching initial game state and stats. Verified the same live API state before and after rebooting CT 103. The app, timer, and Tailscale daemon came back active. Fry-By CT 102 still returned `{"status":"ok"}`.
+- After the owner approved enrollment, confirmed both guests were on the same tailnet. The local Tailscale peer listing showed one owner across the visible same-tailnet devices. Enabled persistent Tailscale Serve on CT 103, verified tailnet-only HTTPS, and checked that no public Funnel was configured. A direct LAN request to port 4174 failed as expected.
+- Verified trusted HTTPS, app HTML and JavaScript, manifest, icon, service worker, and shared state API from Fry-By CT 102 over the tailnet. Tailscale DNS resolved Sudoku’s name, while CT 102’s system resolver and the Codex browser did not. The peer HTTPS check used the verified Tailscale address with the original TLS hostname. CT 103 reached the normal HTTPS URL through its system resolver. After a second CT 103 reboot, Serve resumed, the database history ID matched, the backup timer was active, and Fry-By remained healthy.
+- The owner confirmed that the iPhone setup worked. The device model, iOS version, and results for the remaining physical-device checklist cases are pending.
 
 ## Owner decisions carried forward
 
@@ -83,4 +93,4 @@ The approved decisions and [current contracts](../docs/contracts.md) supersede t
 
 ## Resume here
 
-Ticket 06 resumes with authorization to provision CT 103 and deploy a release built from a reviewed commit. Recheck that ID 103 is free at provisioning time. The proposed guest hostname is `sudokuapp-web`. Confirm tailnet access and the off-guest backup destination before verifying the deployment. Follow the [Proxmox runbook](../docs/proxmox-deployment.md) and the [physical iPhone checklist](../docs/iphone-pwa.md#physical-iphone-acceptance).
+Use the private HTTPS hostname listed for `sudokuapp-web` in Tailscale Machines to run any remaining [physical iPhone checks](../docs/iphone-pwa.md#physical-iphone-acceptance). Routine daily snapshots are stored inside CT 103. The off-guest backup destination remains open. [Proxmox runbook](../docs/proxmox-deployment.md)

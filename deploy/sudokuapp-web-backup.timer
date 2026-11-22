@@ -1,0 +1,9 @@
+[Unit]
+Description=Schedule a daily SudokuApp-Web SQLite snapshot
+
+[Timer]
+OnCalendar=*-*-* 08:30:00 UTC
+Persistent=yes
+
+[Install]
+WantedBy=timers.target

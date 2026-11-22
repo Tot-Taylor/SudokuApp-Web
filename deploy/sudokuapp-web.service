@@ -1,0 +1,27 @@
+[Unit]
+Description=SudokuApp-Web private Sudoku app
+After=network.target
+StartLimitIntervalSec=60s
+StartLimitBurst=5
+
+[Service]
+Type=exec
+User=sudokuapp-web
+Group=sudokuapp-web
+WorkingDirectory=/opt/sudokuapp-web/current
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/sudokuapp-web/server.env
+ExecStart=/usr/local/bin/node server/main.ts
+Restart=on-failure
+RestartSec=3s
+TimeoutStopSec=30s
+StateDirectory=sudokuapp-web
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

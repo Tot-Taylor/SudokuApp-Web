@@ -1,0 +1,20 @@
+[Unit]
+Description=SudokuApp-Web daily SQLite snapshot
+After=sudokuapp-web.service
+
+[Service]
+Type=oneshot
+User=sudokuapp-web
+Group=sudokuapp-web
+WorkingDirectory=/opt/sudokuapp-web/current
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/sudokuapp-web/server.env
+ExecStart=/usr/local/bin/node server/admin.ts backup-daily ${SUDOKU_DB} /var/backups/sudokuapp-web
+StateDirectory=sudokuapp-web
+StateDirectoryMode=0700
+ReadWritePaths=/var/backups/sudokuapp-web
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes

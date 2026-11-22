@@ -1,0 +1,21 @@
+{
+  "sourceCommit": "b76c97f025ea7de5bde8fa7a997c5856ce43169b",
+  "difficulties": [
+    { "id": "easy", "label": "Easy", "minClues": 40, "maxClues": 81, "complexity": "singles", "nativePoints": 1 },
+    { "id": "medium", "label": "Medium", "minClues": 33, "maxClues": 39, "complexity": "singles", "nativePoints": 5 },
+    { "id": "hard", "label": "Hard", "minClues": 28, "maxClues": 32, "complexity": "advanced-search", "nativePoints": 10 },
+    { "id": "expert", "label": "Expert", "minClues": 22, "maxClues": 27, "complexity": "advanced-search", "nativePoints": 25 }
+  ],
+  "solverCases": [
+    {
+      "name": "Row duplicate is rejected",
+      "givens": [{ "row": 0, "column": 0, "value": 5 }],
+      "placement": { "row": 0, "column": 1, "value": 5 },
+      "expectedValid": false
+    }
+  ],
+  "generatorCases": [
+    { "difficulty": "easy", "expectedSolutionCount": 1 },
+    { "difficulty": "medium", "seed": 42, "maxAttempts": 30, "expectSameBoardOnRepeat": true }
+  ]
+}

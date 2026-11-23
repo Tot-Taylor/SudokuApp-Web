@@ -105,11 +105,12 @@ test('serves the standalone manifest and icons and precaches only release files'
   expect(manifest.headers()['content-type']).toContain('application/manifest+json');
   expect(await manifest.json()).toMatchObject({
     name: 'Sudoku', short_name: 'Sudoku', id: '/', scope: '/', start_url: '/', display: 'standalone',
-    icons: [192, 512].map((size) => ({ src: `/icons/sudoku-v1-${size}.png`, sizes: `${size}x${size}`, type: 'image/png' })),
+    background_color: '#fffaed',
+    icons: [192, 512].map((size) => ({ src: `/icons/sudoku-v2-${size}.png`, sizes: `${size}x${size}`, type: 'image/png' })),
   });
-  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', '/icons/sudoku-v1-180.png');
+  await expect(page.locator('link[rel="apple-touch-icon"]')).toHaveAttribute('href', '/icons/sudoku-v2-180.png');
   for (const size of [180, 192, 512]) {
-    const icon = await request.get(app.url + `/icons/sudoku-v1-${size}.png`);
+    const icon = await request.get(app.url + `/icons/sudoku-v2-${size}.png`);
     expect(icon.headers()['content-type']).toContain('image/png');
     const png = await icon.body();
     expect(png.subarray(1, 4).toString()).toBe('PNG');
@@ -125,9 +126,9 @@ test('serves the standalone manifest and icons and precaches only release files'
     expect.stringMatching(/^\/assets\/sudoku-shell-.*\.html$/),
     expect.stringMatching(/^\/assets\/.*\.css$/),
     expect.stringMatching(/^\/assets\/generator\.worker-.*\.js$/),
-    '/icons/sudoku-v1-180.png',
+    '/icons/sudoku-v2-180.png',
   ]));
-  expect(paths.every((path) => path.startsWith('/assets/') || path.startsWith('/icons/sudoku-v1-'))).toBe(true);
+  expect(paths.every((path) => path.startsWith('/assets/') || path.startsWith('/icons/sudoku-v2-'))).toBe(true);
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(page.getByText('Offline play is ready on this device.')).toBeVisible();
 });

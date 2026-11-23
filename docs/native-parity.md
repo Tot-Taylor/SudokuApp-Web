@@ -24,4 +24,4 @@ The web engine seeds three independent diagonal boxes, completes the grid with b
 
 ## Web layout
 
-The Home screen adds a noninteractive puzzle preview and uses two columns where desktop width permits. The game panel preserves the pink and gold board, heavier box boundaries, selected row and column, Eraser and single-row number pad. Keyboard arrows move focus across the grid, digits edit an editable cell, and Delete or Backspace erases. The clock appears at completion. The statistics table adds the approved per-tier totals and times. The Settings and Shop screens provide empty and placeholder states for the current feature set.
+The Home screen adds a noninteractive puzzle preview and uses two columns where desktop width permits. The game panel uses a yellow and orange palette with heavier box boundaries, selected row and column, Eraser and a single-row number pad. Keyboard arrows move focus across the grid, digits edit an editable cell, and Delete or Backspace erases. The clock appears at completion. The statistics table adds the approved per-tier totals and times. The Settings and Shop screens provide empty and placeholder states for the current feature set.

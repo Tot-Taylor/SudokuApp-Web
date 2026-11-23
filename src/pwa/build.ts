@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { Plugin } from 'vite';
 
-const icons = [180, 192, 512].map((size) => `/icons/sudoku-v1-${size}.png`);
+const icons = [180, 192, 512].map((size) => `/icons/sudoku-v2-${size}.png`);
 
 export function offlineBuild(): Plugin {
   return {

@@ -35,13 +35,13 @@ if (lstatSync(destination, { throwIfNoEntry: false })) throw new Error('That rel
 const runtimeFiles = [
   'package.json', 'package-lock.json', '.node-version',
   'server/admin.ts', 'server/app.ts', 'server/database.ts', 'server/main.ts', 'server/maintenance.ts',
-  'src/contracts/game.ts', 'src/contracts/sync.ts',
+  'src/contracts/board-history.ts', 'src/contracts/game.ts', 'src/contracts/sync.ts',
   'src/engine/board.ts', 'src/engine/generator.ts', 'src/engine/solver.ts',
   'deploy/server.env.example', 'deploy/sudokuapp-web.service',
   'deploy/sudokuapp-web-backup.service', 'deploy/sudokuapp-web-backup.timer',
 ];
 const publicFiles = [
-  'manifest.webmanifest', 'icons/sudoku-v1-180.png', 'icons/sudoku-v1-192.png', 'icons/sudoku-v1-512.png',
+  'manifest.webmanifest', 'icons/sudoku-v2-180.png', 'icons/sudoku-v2-192.png', 'icons/sudoku-v2-512.png',
 ];
 
 async function copy(source: string, target: string) {

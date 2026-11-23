@@ -143,12 +143,75 @@ test('highlights Sudoku peers and matching givens and entries without making giv
   await expect(entry).toHaveCSS('background-color', 'rgb(255, 217, 128)');
   await expect(entry).toHaveCSS('color', 'rgb(0, 0, 0)');
   await expect(five).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Eraser' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Eraser' })).toHaveAttribute('aria-pressed', 'false');
 
   await entry.click();
   await entry.press('Delete');
   await expect(matches).toHaveCount(0);
   await expect(five).toBeEnabled();
+  await fitsViewport(page);
+});
+
+test('Eraser stays active across cells, blocks number entry, and saves cleared values', async ({ page }) => {
+  const second = snapshot.givens.indexOf(null, firstEmpty + 1);
+  const blank = snapshot.givens.indexOf(null, second + 1);
+  const values = snapshot.values.slice();
+  values[firstEmpty] = 6;
+  values[second] = 7;
+  await seedStorage(page, { ...snapshot, values });
+  const resume = page.getByRole('button', { name: 'Continue Game' });
+  await resume.click();
+  const board = page.getByRole('grid');
+  const cells = board.getByRole('gridcell');
+  const firstEntry = cells.nth(firstEmpty);
+  const secondEntry = cells.nth(second);
+  const empty = cells.nth(blank);
+  const given = board.getByRole('gridcell', { name: /given$/ }).first();
+  const givenDigit = await given.textContent();
+  const toggle = page.getByRole('button', { name: 'Eraser' });
+  const keypad = page.getByRole('group', { name: 'Number pad' });
+  const four = keypad.getByRole('button', { name: '4' });
+
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  const initialBackground = await toggle.evaluate((button) => getComputedStyle(button).backgroundColor);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle).not.toHaveCSS('background-color', initialBackground);
+  await expect(four).toBeDisabled();
+
+  await given.click();
+  await expect(given).toHaveText(givenDigit!);
+  await empty.click();
+  await expect(empty).toBeEmpty();
+  await expect(board.locator('[aria-selected="true"]')).toHaveCount(0);
+  await firstEntry.press('4');
+  await expect(firstEntry).toHaveText('6');
+  await firstEntry.press('ArrowRight');
+  await expect(firstEntry).toHaveText('6');
+  await expect(secondEntry).toHaveText('7');
+
+  await firstEntry.click();
+  await expect(firstEntry).toBeEmpty();
+  await secondEntry.click();
+  await expect(secondEntry).toBeEmpty();
+  await expect(secondEntry).toHaveAttribute('data-highlight', 'selected');
+  await expect(board.locator('[data-highlight="peer"]')).toHaveCount(20);
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(async () => (await readReplica(page)).active?.values).toEqual(snapshot.values);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await firstEntry.click();
+  await four.click();
+  await secondEntry.click();
+  await firstEntry.click();
+  await expect(firstEntry).toHaveText('4');
+  await expect.poll(async () => (await readReplica(page)).active?.values[firstEmpty]).toBe(4);
+  await page.reload();
+  await resume.click();
+  await expect(firstEntry).toHaveText('4');
+  await expect(secondEntry).toBeEmpty();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await fitsViewport(page);
 });
 

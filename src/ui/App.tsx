@@ -155,6 +155,7 @@ export function App() {
   const [notice, setNotice] = useState('');
   const [session, setSession] = useState<GameSession | null>(null);
   const [selectedGiven, setSelectedGiven] = useState<number | null>(null);
+  const [eraserEnabled, setEraserEnabled] = useState(false);
   const install = useInstallState();
   const sessionRef = useRef<GameSession | null>(null);
   const pending = useRef<AbortController | null>(null);
@@ -176,7 +177,10 @@ export function App() {
   const setCurrent = useCallback((game: GameSession | null) => {
     sessionRef.current = game;
     setSession(game);
-    if (game === null) setSelectedGiven(null);
+    if (game === null) {
+      setSelectedGiven(null);
+      setEraserEnabled(false);
+    }
   }, []);
 
   const act = useCallback((action: GameAction) => {
@@ -186,6 +190,7 @@ export function App() {
     const result = updateGame(current, action, performance.now());
     if (result.session !== current) setCurrent(result.session);
     if (result.session.snapshot !== current.snapshot) {
+      if (action.type === 'erase') setSelectedGiven(null);
       const checkpoint = action.type !== 'place' && action.type !== 'erase';
       const previous = checkpoint && current.snapshot.status === 'active' ? current.snapshot : undefined;
       commit(result.session.snapshot, previous);
@@ -316,7 +321,9 @@ export function App() {
   const snapshot = session?.snapshot;
   const gameTitle = snapshot ? `${DIFFICULTY_RULES[snapshot.difficulty].label} puzzle` : 'Puzzle';
   const selectedCell = selectedGiven ?? snapshot?.selectedCell ?? null;
-  const canEnter = snapshot?.status === 'active' && selectedGiven === null && snapshot.selectedCell !== null;
+  const isPlaying = snapshot?.status === 'active';
+  const eraserActive = isPlaying && eraserEnabled;
+  const canEnter = isPlaying && !eraserActive && selectedGiven === null && snapshot.selectedCell !== null;
   const saveStatus = <SaveStatus view={view} saving={gameWrites > 0}
     onRetry={() => client.retry()} onReview={() => navigate('recovery')} />;
   const offlineStatus = {
@@ -403,12 +410,15 @@ export function App() {
                 </span>
               )}
             </div>
-            <GameBoard key={snapshot.gameId} snapshot={snapshot} selectedCell={selectedCell}
+            <GameBoard key={snapshot.gameId} snapshot={snapshot} selectedCell={selectedCell} eraserActive={eraserActive}
               onSelect={selectCell} onAction={act} />
             <div className="board-tools">
               <button type="button" className="button secondary erase-button"
-                onClick={() => act({ type: 'erase' })} disabled={!canEnter}>Eraser</button>
-              <p id="keyboard-help" className="keyboard-help">Arrow keys move · 1–9 enter · Delete erases</p>
+                aria-pressed={eraserActive} disabled={!isPlaying}
+                onClick={() => setEraserEnabled((enabled) => !enabled)}>Eraser</button>
+              <p id="keyboard-help" className="keyboard-help">{eraserActive
+                ? 'Arrow keys move · Enter, Space or Delete erases'
+                : 'Arrow keys move · 1–9 enter · Delete erases'}</p>
             </div>
             <div className="keypad" role="group" aria-label="Number pad">
               {DIGITS.map((digit) => (

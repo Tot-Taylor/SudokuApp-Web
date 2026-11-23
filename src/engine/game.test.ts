@@ -31,6 +31,24 @@ test('new game, selection, placement and erase preserve givens and previous sess
   assert.equal(played.snapshot.values[firstEmpty], 3);
 });
 
+test('erasing a specific cell clears and selects it in one update, while invalid targets are no-ops', () => {
+  const fresh = startGame(puzzle, gameId);
+  const otherEmpty = puzzle.givens.indexOf(null, firstEmpty + 1);
+  const selected = updateGame(fresh, { type: 'select', cell: firstEmpty }, 0).session;
+  const played = updateGame(selected, { type: 'place', digit: 3 }, 0).session;
+  const moved = updateGame(played, { type: 'select', cell: otherEmpty }, 0).session;
+  const clockRunning = updateGame(moved, { type: 'foreground', active: true }, 0).session;
+  for (const cell of [firstGiven, otherEmpty, 81]) {
+    assert.equal(updateGame(clockRunning, { type: 'erase', cell }, 100).session, clockRunning);
+  }
+
+  const erased = updateGame(clockRunning, { type: 'erase', cell: firstEmpty }, 100).session;
+  assert.equal(erased.snapshot.values[firstEmpty], null);
+  assert.equal(erased.snapshot.selectedCell, firstEmpty);
+  assert.equal(erased.snapshot.elapsedMs, 100);
+  assert.equal(clockRunning.snapshot.values[firstEmpty], 3);
+});
+
 test('clock excludes hidden time and restores selection, board and elapsed time on a fresh clock', () => {
   let session = startGame(puzzle, gameId);
   session = updateGame(session, { type: 'foreground', active: true }, 100.5).session;

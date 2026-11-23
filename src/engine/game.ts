@@ -14,7 +14,8 @@ export type GameAction =
   | { type: 'checkpoint' }
   | { type: 'select'; cell: number }
   | { type: 'place'; digit: number }
-  | { type: 'erase'; cell?: number };
+  | { type: 'erase'; cell?: number }
+  | { type: 'clear-all' };
 
 export type GameUpdate = { session: GameSession; completion: Completion | null };
 
@@ -79,6 +80,12 @@ export function updateGame(session: GameSession, action: GameAction, now: number
   }
 
   const { givens, selectedCell } = session.snapshot;
+  if (action.type === 'clear-all') {
+    if (session.snapshot.values.every((value, index) => value === givens[index])) {
+      return { session, completion: null };
+    }
+    return { session: { ...session, snapshot: { ...session.snapshot, values: givens.slice() } }, completion: null };
+  }
   if (action.type === 'select') {
     if (!isCellIndex(action.cell) || givens[action.cell] !== null || action.cell === selectedCell) {
       return { session, completion: null };

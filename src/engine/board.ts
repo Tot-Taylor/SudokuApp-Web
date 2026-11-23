@@ -21,6 +21,25 @@ export const UNITS = [
   ...boxUnits,
 ];
 
+export function conflictingCells(values: Board): Set<number> {
+  const conflicts = new Set<number>();
+  for (const unit of UNITS) {
+    const firstByValue = new Map<number, number>();
+    for (const { index } of unit) {
+      const value = values[index];
+      if (value == null) continue;
+      const first = firstByValue.get(value);
+      if (first === undefined) {
+        firstByValue.set(value, index);
+      } else {
+        conflicts.add(first);
+        conflicts.add(index);
+      }
+    }
+  }
+  return conflicts;
+}
+
 export function isDigit(value: number): boolean {
   return Number.isInteger(value) && value >= 1 && value <= SIDE;
 }

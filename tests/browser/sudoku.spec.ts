@@ -269,6 +269,53 @@ test('Clear All confirms, preserves Eraser mode, and saves the same puzzle with 
   expect((await readReplica(page)).active?.gameId).toBe(gameId);
 });
 
+test('duplicate dots follow entry, replacement, restored progress, erasure, and Clear All', async ({ page }) => {
+  await seedStorage(page, snapshot);
+  const resume = page.getByRole('button', { name: 'Continue Game' });
+  await resume.click();
+  const board = page.getByRole('grid');
+  const entry = board.getByRole('gridcell', { name: /^Row 1, column 2,/ });
+  const conflicts = board.locator('[aria-invalid="true"]');
+  const keypad = page.getByRole('group', { name: 'Number pad' });
+  const five = keypad.getByRole('button', { name: '5' });
+
+  await entry.click();
+  await five.click();
+  await expect(conflicts).toHaveCount(4);
+  await expect(conflicts.and(board.locator('[data-given="true"]'))).toHaveCount(3);
+  await expect(entry).toHaveAccessibleDescription('Duplicate number in its row, column, or box.');
+  await expect(entry).toHaveCSS('color', 'rgb(0, 0, 0)');
+  await expect(entry).toHaveAttribute('data-highlight', 'selected');
+  await expect(conflicts.and(board.locator('[data-highlight="match"]'))).toHaveCount(3);
+  expect(await conflicts.evaluateAll((cells) => cells.every((cell) => {
+    const dot = getComputedStyle(cell, '::after');
+    return dot.backgroundColor === 'rgb(180, 35, 24)' && dot.width === '5px';
+  }))).toBe(true);
+
+  // This fixture's solution has a different digit here, but 3 does not duplicate a peer.
+  expect(snapshot.solution[1]).not.toBe(3);
+  await keypad.getByRole('button', { name: '3' }).click();
+  await expect(entry).toHaveText('3');
+  await expect(conflicts).toHaveCount(0);
+
+  await five.click();
+  await expect.poll(async () => (await readReplica(page)).active?.values[1]).toBe(5);
+  await page.reload();
+  await resume.click();
+  await expect(conflicts).toHaveCount(4);
+  await entry.press('Delete');
+  await expect(entry).toBeEmpty();
+  await expect(conflicts).toHaveCount(0);
+
+  await five.click();
+  await expect(conflicts).toHaveCount(4);
+  await page.getByRole('button', { name: 'Clear All' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Clear All' }).click();
+  await expect(conflicts).toHaveCount(0);
+  await expect(entry).toBeEmpty();
+  await fitsViewport(page);
+});
+
 test('cancellation and a failed replacement preserve the saved puzzle, and retry can replace it', async ({
   page, context,
 }) => {

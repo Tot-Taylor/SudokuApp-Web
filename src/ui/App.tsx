@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { sameGameBoard } from '../contracts/board-history.ts';
 import { DIFFICULTIES, DIFFICULTY_RULES, completionStats } from '../contracts/game.ts';
 import type { ActiveGame, Difficulty, GameSnapshot, Stats } from '../contracts/game.ts';
 import { generateInWorker } from '../engine/generate-in-worker.ts';
@@ -193,7 +194,7 @@ export function App() {
     if (result.session !== current) setCurrent(result.session);
     if (result.session.snapshot !== current.snapshot) {
       if (action.type === 'erase') setSelectedGiven(null);
-      const checkpoint = action.type !== 'place' && action.type !== 'erase' && action.type !== 'clear-all';
+      const checkpoint = action.type === 'select' || action.type === 'checkpoint' || action.type === 'foreground';
       const previous = checkpoint && current.snapshot.status === 'active' ? current.snapshot : undefined;
       commit(result.session.snapshot, previous);
     }
@@ -254,7 +255,7 @@ export function App() {
       return;
     }
     if (snapshot.elapsedMs === activeGame.elapsedMs && snapshot.selectedCell === activeGame.selectedCell
-      && snapshot.values.every((value, index) => value === activeGame.values[index])) return;
+      && sameGameBoard(snapshot, activeGame)) return;
 
     const restored = restoreGame(activeGame);
     if (restored) {
@@ -421,6 +422,9 @@ export function App() {
                 <button type="button" className="button secondary erase-button"
                   aria-pressed={eraserActive} disabled={!isPlaying}
                   onClick={() => setEraserEnabled((enabled) => !enabled)}>Eraser</button>
+                <button type="button" className="button secondary"
+                  disabled={!isPlaying || !snapshot.undoHistory?.entries.length}
+                  onClick={() => act({ type: 'undo' })}>Undo</button>
                 <button type="button" className="button secondary clear-all-button" ref={clearAllButton}
                   disabled={!isPlaying} onClick={() => setPrompt({ type: 'clear-all', gameId: snapshot.gameId })}>
                   Clear All

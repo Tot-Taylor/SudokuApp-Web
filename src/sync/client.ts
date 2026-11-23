@@ -1,4 +1,5 @@
 import { receiptSchema, stateSchema, syncErrorSchema } from '../contracts/sync.ts';
+import { activeGameSchema } from '../contracts/game.ts';
 import type { Mutation, SharedState, SyncError } from '../contracts/sync.ts';
 import type { ActiveGame, GameSnapshot } from '../contracts/game.ts';
 import { loadPreview, PREVIEW_KEY } from '../ui/preview-store.ts';
@@ -103,7 +104,12 @@ export class SyncClient {
     const preview = loadPreview();
     const initial = seedReplica(preview.data, preview.issue === 'invalid-save');
     try {
-      this.snapshot = (await this.store.transact((previous) => previous ?? initial))!;
+      this.snapshot = (await this.store.transact((previous) => {
+        if (!previous) return initial;
+        if (previous.active?.undoHistory === undefined) return previous;
+        const saved = activeGameSchema.safeParse(previous.active);
+        return saved.success && !saved.data.undoHistory ? { ...previous, active: saved.data } : previous;
+      }))!;
       // The legacy key is cleared only after the complete migration commits.
       if (preview.issue === null) {
         try { localStorage.removeItem(PREVIEW_KEY); } catch { /* The IndexedDB record marks the import. */ }

@@ -269,6 +269,81 @@ test('Clear All confirms, preserves Eraser mode, and saves the same puzzle with 
   expect((await readReplica(page)).active?.gameId).toBe(gameId);
 });
 
+test('Undo reverses edits and Clear All after reload and starts empty for a new puzzle', async ({ page }) => {
+  await seedStorage(page, snapshot);
+  const continueGame = page.getByRole('button', { name: 'Continue Game' });
+  await continueGame.click();
+  const grid = page.getByRole('grid', { name: 'Sudoku board' });
+  const editable = grid.locator('[data-given="false"]');
+  const [first, second, third] = [editable.nth(0), editable.nth(1), editable.nth(2)];
+  const given = grid.locator('[data-given="true"]').first();
+  const givenValue = await given.innerText();
+  const undo = page.getByRole('button', { name: 'Undo', exact: true });
+  const eraser = page.getByRole('button', { name: 'Eraser' });
+  const clear = page.getByRole('main').getByRole('button', { name: 'Clear All', exact: true });
+  const confirm = page.getByRole('dialog').getByRole('button', { name: 'Clear All' });
+
+  await expect(undo).toBeDisabled();
+  await undo.evaluate((button: HTMLButtonElement) => button.click());
+  await expect(first).toBeEmpty();
+  await given.click();
+  await first.click();
+  await eraser.click();
+  await first.click();
+  await eraser.click();
+  await clear.click();
+  await confirm.click();
+  await expect(undo).toBeDisabled();
+
+  for (const [index, cell] of [first, second, third].entries()) {
+    await cell.click();
+    await cell.press(String(index + 1));
+  }
+  await third.press('3');
+  await third.press('4');
+  await undo.click();
+  await expect(third).toHaveText('3');
+  await eraser.click();
+  await third.click();
+  await expect(third).toBeEmpty();
+  await undo.click();
+  await expect(third).toHaveText('3');
+  await expect(eraser).toHaveAttribute('aria-pressed', 'true');
+
+  await clear.click();
+  await confirm.click();
+  for (const cell of [first, second, third]) await expect(cell).toBeEmpty();
+  await expect.poll(async () => (await readReplica(page)).active?.values).toEqual(snapshot.givens);
+  await page.reload();
+  await continueGame.click();
+  await undo.click();
+  await expect(first).toHaveText('1');
+  await expect(second).toHaveText('2');
+  await expect(third).toHaveText('3');
+  await expect(given).toHaveText(givenValue);
+  for (const cell of [third, second, first]) {
+    await undo.click();
+    await expect(cell).toBeEmpty();
+  }
+  await expect(undo).toBeDisabled();
+  await expect.poll(async () => (await readReplica(page)).active?.values).toEqual(snapshot.givens);
+  await fitsViewport(page);
+
+  await first.click();
+  await first.press('9');
+  await expect(undo).toBeEnabled();
+  await page.getByRole('button', { name: 'Back to Home' }).click();
+  await page.getByRole('button', { name: 'New Game' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Easy' }).click();
+  await page.getByRole('button', { name: 'Start New' }).click();
+  await expect(grid).toBeVisible();
+  await expect(undo).toBeDisabled();
+  await expect.poll(async () => {
+    const active = (await readReplica(page)).active;
+    return active !== null && active.gameId !== gameId;
+  }).toBe(true);
+});
+
 test('duplicate dots follow entry, replacement, restored progress, erasure, and Clear All', async ({ page }) => {
   await seedStorage(page, snapshot);
   const resume = page.getByRole('button', { name: 'Continue Game' });

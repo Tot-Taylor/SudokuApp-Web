@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import {
+  candidateNotesSchema, CELL_COUNT, cellIndexSchema, digitSchema, undoHistorySchema, validUndoHistory,
+} from './board-history.ts';
 
 export const SCHEMA_VERSION = 1;
 export const DIFFICULTIES = ['easy', 'medium', 'hard', 'expert'] as const;
@@ -16,8 +19,7 @@ export const DIFFICULTY_RULES = {
   complexity: 'singles' | 'advanced-search';
 }>;
 
-const digitSchema = z.int().min(1).max(9);
-const boardSchema = z.array(digitSchema.nullable()).length(81);
+const boardSchema = z.array(digitSchema.nullable()).length(CELL_COUNT);
 export const durationSchema = z.int().nonnegative();
 
 const gameFields = {
@@ -25,13 +27,18 @@ const gameFields = {
   gameId: z.uuid(),
   difficulty: z.enum(DIFFICULTIES),
   givens: boardSchema,
-  solution: z.array(digitSchema).length(81),
+  solution: z.array(digitSchema).length(CELL_COUNT),
   values: boardSchema,
-  selectedCell: z.int().min(0).max(80).nullable(),
+  selectedCell: cellIndexSchema.nullable(),
   elapsedMs: durationSchema,
 };
 
-const activeShape = z.strictObject({ ...gameFields, status: z.literal('active') });
+const activeShape = z.strictObject({
+  ...gameFields,
+  status: z.literal('active'),
+  candidateNotes: candidateNotesSchema.optional(),
+  undoHistory: undoHistorySchema.optional().catch(undefined),
+});
 const solvedShape = z.strictObject({ ...gameFields, status: z.literal('solved') });
 
 type SnapshotShape = z.output<typeof activeShape> | z.output<typeof solvedShape>;
@@ -43,6 +50,10 @@ function validateSnapshot(game: SnapshotShape, ctx: z.RefinementCtx): void {
   for (const [index, given] of game.givens.entries()) {
     const solution = game.solution[index];
     const value = game.values[index];
+
+    if (game.status === 'active' && game.candidateNotes?.[index] && value !== null) {
+      ctx.addIssue({ code: 'custom', path: ['candidateNotes', index], message: 'Only blank cells can have notes.' });
+    }
 
     if (given === null) {
       editableCells += 1;
@@ -74,9 +85,12 @@ function validateSnapshot(game: SnapshotShape, ctx: z.RefinementCtx): void {
   }
 }
 
-export const activeGameSchema = activeShape.superRefine(validateSnapshot);
+export const activeGameSchema = activeShape.superRefine(validateSnapshot).transform((game) => {
+  if (!validUndoHistory(game)) delete game.undoHistory;
+  return game;
+});
 export const solvedGameSchema = solvedShape.superRefine(validateSnapshot);
-export const gameSnapshotSchema = z.discriminatedUnion('status', [activeGameSchema, solvedGameSchema]);
+export const gameSnapshotSchema = z.union([activeGameSchema, solvedGameSchema]);
 export type GameSnapshot = z.infer<typeof gameSnapshotSchema>;
 export type ActiveGame = z.infer<typeof activeGameSchema>;
 export type SolvedGame = z.infer<typeof solvedGameSchema>;

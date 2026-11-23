@@ -116,6 +116,34 @@ test('offline changes survive reload and a fresh commit wins across two devices'
   }
 });
 
+test('a fresh device can undo synced edits and sync the restored board', async ({ app, page, browser }) => {
+  const game = puzzle(21);
+  const cell = game.givens.indexOf(null);
+  save(app.db, { kind: 'save-game', game });
+  await page.goto(app.url);
+  await openGame(page);
+  await place(page, cell, 4);
+  await place(page, cell, 5);
+  await expect(page.getByRole('status')).toHaveText('Synced');
+  expect(readState(app.db).activeGame?.undoHistory?.entries).toHaveLength(2);
+
+  const device = await browser.newContext();
+  try {
+    const other = await device.newPage();
+    await other.goto(app.url);
+    await openGame(other);
+    const undo = other.getByRole('button', { name: 'Undo', exact: true });
+    await undo.click();
+    await expect.poll(() => readState(app.db).activeGame?.values[cell]).toBe(4);
+    await undo.click();
+    await expect(undo).toBeDisabled();
+    await expect.poll(() => readState(app.db).activeGame?.values[cell]).toBe(null);
+    expect(readState(app.db).activeGame?.undoHistory).toBeUndefined();
+  } finally {
+    await device.close();
+  }
+});
+
 test('lost acknowledgement retries the same operation and preserves a later accepted puzzle', async ({
   app, page, context,
 }) => {

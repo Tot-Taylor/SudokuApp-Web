@@ -1,4 +1,5 @@
 import { completionStats, SCHEMA_VERSION } from '../contracts/game.ts';
+import { sameGameBoard } from '../contracts/board-history.ts';
 import type { ActiveGame, Completion, GameSnapshot } from '../contracts/game.ts';
 import type { Intent, Mutation, MutationReceipt, SharedState } from '../contracts/sync.ts';
 import type { PreviewData } from '../ui/preview-store.ts';
@@ -30,8 +31,7 @@ export function asMutation(entry: Queued, historyId: string): Mutation {
 }
 
 function sameBoard(a: ActiveGame | null, b: ActiveGame | null): boolean {
-  return a === b || Boolean(a && b && a.gameId === b.gameId
-    && a.values.every((digit, index) => digit === b.values[index]));
+  return a === b || (a !== null && b !== null && sameGameBoard(a, b));
 }
 
 function sameSnapshot(a: ActiveGame | null, b: ActiveGame): boolean {

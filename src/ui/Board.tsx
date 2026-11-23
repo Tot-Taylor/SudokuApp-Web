@@ -4,6 +4,7 @@ import type { GameSnapshot } from '../contracts/game.ts';
 import { CELLS, SIDE } from '../engine/board.ts';
 import type { Board } from '../engine/board.ts';
 import type { GameAction } from '../engine/game.ts';
+import { cellHighlight } from './cell-highlight.ts';
 
 const ROWS = Array.from({ length: SIDE }, (_, row) => CELLS.slice(row * SIDE, (row + 1) * SIDE));
 const SAMPLE = Array.from('530070000600195000098000060800060003400803001700020006060000280000419005000080079',
@@ -32,22 +33,20 @@ const ARROW_OFFSET: Readonly<Record<string, readonly [number, number]>> = {
 };
 
 export function GameBoard({
-  snapshot, onAction,
+  snapshot, selectedCell, onSelect, onAction,
 }: {
   snapshot: GameSnapshot;
+  selectedCell: number | null;
+  onSelect: (index: number) => void;
   onAction: (action: GameAction) => void;
 }) {
-  const { givens, values, selectedCell, status } = snapshot;
+  const { givens, values, status } = snapshot;
   const [focusIndex, setFocusIndex] = useState(() => selectedCell ?? givens.indexOf(null));
   const cellRefs = useRef<Array<HTMLDivElement | null>>([]);
 
-  function select(index: number) {
-    if (status === 'active' && givens[index] === null) onAction({ type: 'select', cell: index });
-  }
-
   function moveFocus(index: number) {
     cellRefs.current[index]?.focus();
-    select(index);
+    onSelect(index);
   }
 
   function handleKey(event: KeyboardEvent<HTMLDivElement>, index: number) {
@@ -66,19 +65,22 @@ export function GameBoard({
       moveFocus(cell.row * SIDE + (event.key === 'End' ? SIDE - 1 : 0));
       return;
     }
-    if (status !== 'active' || givens[index] !== null) return;
+    if (status !== 'active') return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect(index);
+      return;
+    }
+    if (givens[index] !== null) return;
 
     if (/^[1-9]$/.test(event.key)) {
       event.preventDefault();
-      select(index);
+      onSelect(index);
       onAction({ type: 'place', digit: Number(event.key) });
     } else if (event.key === 'Backspace' || event.key === 'Delete') {
       event.preventDefault();
-      select(index);
+      onSelect(index);
       onAction({ type: 'erase' });
-    } else if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      select(index);
     }
   }
 
@@ -90,7 +92,7 @@ export function GameBoard({
           {row.map((cell) => {
             const value = values[cell.index];
             const isGiven = givens[cell.index] !== null;
-            const isSelected = cell.index === selectedCell;
+            const highlight = cellHighlight(values, selectedCell, cell.index);
             const label = `Row ${cell.row + 1}, column ${cell.column + 1}, ${value ?? 'empty'}${isGiven ? ', given' : ''}`;
             return (
               <div
@@ -100,9 +102,10 @@ export function GameBoard({
                 role="gridcell"
                 tabIndex={cell.index === focusIndex ? 0 : -1}
                 aria-label={label}
-                aria-selected={isSelected}
+                aria-selected={highlight === 'selected'}
                 aria-readonly={isGiven || status === 'solved'}
                 data-given={isGiven}
+                data-highlight={highlight}
                 onFocus={() => setFocusIndex(cell.index)}
                 onClick={() => { moveFocus(cell.index); }}
                 onKeyDown={(event) => handleKey(event, cell.index)}

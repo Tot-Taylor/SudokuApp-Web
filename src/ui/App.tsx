@@ -154,6 +154,7 @@ export function App() {
   const [gameWrites, setGameWrites] = useState(0);
   const [notice, setNotice] = useState('');
   const [session, setSession] = useState<GameSession | null>(null);
+  const [selectedGiven, setSelectedGiven] = useState<number | null>(null);
   const install = useInstallState();
   const sessionRef = useRef<GameSession | null>(null);
   const pending = useRef<AbortController | null>(null);
@@ -175,6 +176,7 @@ export function App() {
   const setCurrent = useCallback((game: GameSession | null) => {
     sessionRef.current = game;
     setSession(game);
+    if (game === null) setSelectedGiven(null);
   }, []);
 
   const act = useCallback((action: GameAction) => {
@@ -190,6 +192,18 @@ export function App() {
     }
     if (result.completion) setPrompt({ type: 'complete' });
   }, [commit, setCurrent]);
+
+  function selectCell(index: number) {
+    const snapshot = sessionRef.current?.snapshot;
+    if (snapshot?.status !== 'active') return;
+    if (snapshot.givens[index] !== null) {
+      // Givens can be inspected without changing the saved editable cell.
+      setSelectedGiven(index);
+      return;
+    }
+    setSelectedGiven(null);
+    act({ type: 'select', cell: index });
+  }
 
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
@@ -301,7 +315,8 @@ export function App() {
 
   const snapshot = session?.snapshot;
   const gameTitle = snapshot ? `${DIFFICULTY_RULES[snapshot.difficulty].label} puzzle` : 'Puzzle';
-  const canEnter = snapshot?.status === 'active' && snapshot.selectedCell !== null;
+  const selectedCell = selectedGiven ?? snapshot?.selectedCell ?? null;
+  const canEnter = snapshot?.status === 'active' && selectedGiven === null && snapshot.selectedCell !== null;
   const saveStatus = <SaveStatus view={view} saving={gameWrites > 0}
     onRetry={() => client.retry()} onReview={() => navigate('recovery')} />;
   const offlineStatus = {
@@ -388,7 +403,8 @@ export function App() {
                 </span>
               )}
             </div>
-            <GameBoard key={snapshot.gameId} snapshot={snapshot} onAction={act} />
+            <GameBoard key={snapshot.gameId} snapshot={snapshot} selectedCell={selectedCell}
+              onSelect={selectCell} onAction={act} />
             <div className="board-tools">
               <button type="button" className="button secondary erase-button"
                 onClick={() => act({ type: 'erase' })} disabled={!canEnter}>Eraser</button>

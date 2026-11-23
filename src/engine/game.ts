@@ -1,5 +1,7 @@
 import { gameSnapshotSchema, SCHEMA_VERSION } from '../contracts/game.ts';
-import type { Completion, GameSnapshot } from '../contracts/game.ts';
+import type { ActiveGame, Completion, GameSnapshot } from '../contracts/game.ts';
+import { boardChanges, boardKey, cellState, EMPTY_CANDIDATES, MAX_UNDO_ENTRIES, writeCells } from '../contracts/board-history.ts';
+import type { BoardState, UndoEntry } from '../contracts/board-history.ts';
 import { isCellIndex, isDigit } from './board.ts';
 import { isValidPuzzle } from './generator.ts';
 import type { Puzzle } from './generator.ts';
@@ -14,8 +16,10 @@ export type GameAction =
   | { type: 'checkpoint' }
   | { type: 'select'; cell: number }
   | { type: 'place'; digit: number }
+  | { type: 'toggle-candidate'; digit: number }
   | { type: 'erase'; cell?: number }
-  | { type: 'clear-all' };
+  | { type: 'clear-all' }
+  | { type: 'undo' };
 
 export type GameUpdate = { session: GameSession; completion: Completion | null };
 
@@ -59,6 +63,21 @@ function checkpoint(session: GameSession, now: number): GameSession {
   };
 }
 
+function withBoard(game: ActiveGame, board: BoardState, entries: UndoEntry[]): ActiveGame {
+  const snapshot = { ...game, ...board, candidateNotes: board.candidateNotes };
+  if (!snapshot.candidateNotes) delete snapshot.candidateNotes;
+  if (entries.length === 0) delete snapshot.undoHistory;
+  else snapshot.undoHistory = { gameId: game.gameId, boardKey: boardKey(board), entries };
+  return snapshot;
+}
+
+function editBoard(game: ActiveGame, board: BoardState): ActiveGame {
+  const changes = boardChanges(game, board);
+  if (changes.length === 0) return game;
+  const previous = game.undoHistory?.entries ?? [];
+  return withBoard(game, board, [...previous.slice(-(MAX_UNDO_ENTRIES - 1)), changes]);
+}
+
 /** Applies an action with a monotonic timestamp from the caller's current page. */
 export function updateGame(session: GameSession, action: GameAction, now: number): GameUpdate {
   if (!Number.isFinite(now) || now < 0 || now > Number.MAX_SAFE_INTEGER) {
@@ -79,12 +98,21 @@ export function updateGame(session: GameSession, action: GameAction, now: number
     return { session: checkpoint(session, now), completion: null };
   }
 
-  const { givens, selectedCell } = session.snapshot;
+  const game = session.snapshot;
+  const { givens, selectedCell } = game;
+  if (action.type === 'undo') {
+    const entries = game.undoHistory?.entries;
+    const last = entries?.at(-1);
+    if (!entries || !last) return { session, completion: null };
+    const board = writeCells(game, last.map(({ index, before }) => [index, before] as const));
+    return {
+      session: { ...session, snapshot: withBoard(game, board, entries.slice(0, -1)) },
+      completion: null,
+    };
+  }
   if (action.type === 'clear-all') {
-    if (session.snapshot.values.every((value, index) => value === givens[index])) {
-      return { session, completion: null };
-    }
-    return { session: { ...session, snapshot: { ...session.snapshot, values: givens.slice() } }, completion: null };
+    const snapshot = editBoard(game, { values: givens.slice() });
+    return { session: snapshot === game ? session : { ...session, snapshot }, completion: null };
   }
   if (action.type === 'select') {
     if (!isCellIndex(action.cell) || givens[action.cell] !== null || action.cell === selectedCell) {
@@ -97,22 +125,30 @@ export function updateGame(session: GameSession, action: GameAction, now: number
     };
   }
 
-  const value = action.type === 'erase' ? null : action.digit;
   const cell = action.type === 'erase' ? action.cell ?? selectedCell : selectedCell;
   if (cell === null || !isCellIndex(cell) || givens[cell] !== null
-    || (value !== null && !isDigit(value)) || session.snapshot.values[cell] === value) {
+    || (action.type !== 'erase' && !isDigit(action.digit))) {
     return { session, completion: null };
   }
 
-  const timed = checkpoint(session, now);
-  const values = timed.snapshot.values.slice();
-  values[cell] = value;
-  if (values.every((digit, index) => digit === timed.snapshot.solution[index])) {
-    const { gameId, difficulty, elapsedMs } = timed.snapshot;
+  const [value, notes] = cellState(game, cell);
+  if (action.type === 'toggle-candidate' && value !== null) return { session, completion: null };
+  const board = action.type === 'toggle-candidate'
+    ? writeCells(game, [[cell, [null, notes ^ (1 << (action.digit - 1))]]])
+    : writeCells(game, [[cell, [action.type === 'erase' ? null : action.digit, EMPTY_CANDIDATES]]]);
+  const snapshot = editBoard(game, board);
+  if (snapshot === game) return { session, completion: null };
+
+  const timed = checkpoint({ ...session, snapshot }, now);
+  const { values, solution, gameId, difficulty, elapsedMs } = timed.snapshot;
+  if (values.every((digit, index) => digit === solution[index])) {
+    const solved = { ...game, elapsedMs, values, status: 'solved' as const };
+    delete solved.undoHistory;
+    delete solved.candidateNotes;
     return {
-      session: { snapshot: { ...timed.snapshot, status: 'solved', values }, runningSince: null },
+      session: { snapshot: solved, runningSince: null },
       completion: { gameId, difficulty, elapsedMs },
     };
   }
-  return { session: { ...timed, snapshot: { ...timed.snapshot, selectedCell: cell, values } }, completion: null };
+  return { session: { ...timed, snapshot: { ...timed.snapshot, selectedCell: cell } }, completion: null };
 }

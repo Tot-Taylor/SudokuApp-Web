@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { startGame } from '../../src/engine/game.ts';
 import { generatePuzzle } from '../../src/engine/generator.ts';
 import { PREVIEW_KEY } from '../../src/ui/preview-store.ts';
@@ -30,10 +30,27 @@ async function fitsViewport(page: Page) {
   );
 }
 
+async function expectNeutralCells(board: Locator) {
+  const blanks = board.locator('[data-given="false"]');
+  await expect(blanks.first()).toBeVisible();
+  expect(await blanks.evaluateAll((cells) => cells.every((cell) =>
+    cell.childNodes.length === 0
+    && getComputedStyle(cell).backgroundColor === 'rgb(255, 255, 255)'))).toBe(true);
+
+  const givens = board.locator('[data-given="true"]');
+  await expect(givens.first()).toBeVisible();
+  expect(await givens.evaluateAll((cells) => cells.every((cell) => {
+    const { backgroundColor, color } = getComputedStyle(cell);
+    return /^[1-9]$/.test(cell.textContent ?? '')
+      && backgroundColor === 'rgb(232, 232, 232)' && color === 'rgb(0, 0, 0)';
+  }))).toBe(true);
+}
+
 test('starts a puzzle, plays with touch controls and the keyboard, and resumes after reload', async ({ page, context }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Sudoku' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continue Game' })).toBeDisabled();
+  await expectNeutralCells(page.locator('.preview-board'));
   await fitsViewport(page);
 
   await page.getByRole('button', { name: 'New Game' }).click();
@@ -47,6 +64,11 @@ test('starts a puzzle, plays with touch controls and the keyboard, and resumes a
   await expect(keypad.getByRole('button')).toHaveCount(9);
   await expect(keypad.getByRole('button', { name: '6' })).toBeDisabled();
   await expect(board.getByRole('gridcell')).toHaveCount(81);
+  await expectNeutralCells(board);
+  const rows = board.getByRole('row');
+  await expect(rows.nth(0).getByRole('gridcell').nth(1)).toHaveCSS('border-right-width', '1px');
+  await expect(rows.nth(0).getByRole('gridcell').nth(2)).toHaveCSS('border-right-width', '2px');
+  await expect(rows.nth(2).getByRole('gridcell').first()).toHaveCSS('border-bottom-width', '2px');
   const given = board.getByRole('gridcell', { name: /given$/ }).first();
   await given.click();
   await given.press('6');
@@ -61,8 +83,12 @@ test('starts a puzzle, plays with touch controls and the keyboard, and resumes a
   await expect(cell).toHaveAttribute('aria-selected', 'true');
   await keypad.getByRole('button', { name: '6' }).click();
   await expect(cell).toHaveAccessibleName(`${coordinates}, 6`);
+  await expect(cell).toHaveText('6');
+  await expect(cell).toHaveCSS('color', 'rgb(0, 0, 0)');
   await cell.press('Delete');
   await expect(cell).toHaveAccessibleName(`${coordinates}, empty`);
+  await expect(cell).toBeEmpty();
+  await expect(cell).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await cell.press('4');
   await expect(cell).toHaveAccessibleName(`${coordinates}, 4`);
 

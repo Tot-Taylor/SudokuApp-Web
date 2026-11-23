@@ -33,10 +33,11 @@ const ARROW_OFFSET: Readonly<Record<string, readonly [number, number]>> = {
 };
 
 export function GameBoard({
-  snapshot, selectedCell, onSelect, onAction,
+  snapshot, selectedCell, eraserActive, onSelect, onAction,
 }: {
   snapshot: GameSnapshot;
   selectedCell: number | null;
+  eraserActive: boolean;
   onSelect: (index: number) => void;
   onAction: (action: GameAction) => void;
 }) {
@@ -46,7 +47,11 @@ export function GameBoard({
 
   function moveFocus(index: number) {
     cellRefs.current[index]?.focus();
-    onSelect(index);
+  }
+
+  function activateCell(index: number) {
+    if (eraserActive) onAction({ type: 'erase', cell: index });
+    else onSelect(index);
   }
 
   function handleKey(event: KeyboardEvent<HTMLDivElement>, index: number) {
@@ -57,30 +62,35 @@ export function GameBoard({
       event.preventDefault();
       const row = Math.max(0, Math.min(SIDE - 1, cell.row + offset[0]));
       const column = Math.max(0, Math.min(SIDE - 1, cell.column + offset[1]));
-      moveFocus(row * SIDE + column);
+      const target = row * SIDE + column;
+      moveFocus(target);
+      onSelect(target);
       return;
     }
     if (event.key === 'Home' || event.key === 'End') {
       event.preventDefault();
-      moveFocus(cell.row * SIDE + (event.key === 'End' ? SIDE - 1 : 0));
+      const target = cell.row * SIDE + (event.key === 'End' ? SIDE - 1 : 0);
+      moveFocus(target);
+      onSelect(target);
       return;
     }
     if (status !== 'active') return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      onSelect(index);
+      activateCell(index);
       return;
     }
     if (givens[index] !== null) return;
 
     if (/^[1-9]$/.test(event.key)) {
       event.preventDefault();
+      if (eraserActive) return;
       onSelect(index);
       onAction({ type: 'place', digit: Number(event.key) });
     } else if (event.key === 'Backspace' || event.key === 'Delete') {
       event.preventDefault();
-      onSelect(index);
-      onAction({ type: 'erase' });
+      if (!eraserActive) onSelect(index);
+      onAction({ type: 'erase', cell: index });
     }
   }
 
@@ -107,7 +117,10 @@ export function GameBoard({
                 data-given={isGiven}
                 data-highlight={highlight}
                 onFocus={() => setFocusIndex(cell.index)}
-                onClick={() => { moveFocus(cell.index); }}
+                onClick={() => {
+                  moveFocus(cell.index);
+                  activateCell(cell.index);
+                }}
                 onKeyDown={(event) => handleKey(event, cell.index)}
               >
                 {value}

@@ -14,7 +14,7 @@ export type GameAction =
   | { type: 'checkpoint' }
   | { type: 'select'; cell: number }
   | { type: 'place'; digit: number }
-  | { type: 'erase' };
+  | { type: 'erase'; cell?: number };
 
 export type GameUpdate = { session: GameSession; completion: Completion | null };
 
@@ -91,14 +91,15 @@ export function updateGame(session: GameSession, action: GameAction, now: number
   }
 
   const value = action.type === 'erase' ? null : action.digit;
-  if (selectedCell === null || givens[selectedCell] !== null
-    || (value !== null && !isDigit(value)) || session.snapshot.values[selectedCell] === value) {
+  const cell = action.type === 'erase' ? action.cell ?? selectedCell : selectedCell;
+  if (cell === null || !isCellIndex(cell) || givens[cell] !== null
+    || (value !== null && !isDigit(value)) || session.snapshot.values[cell] === value) {
     return { session, completion: null };
   }
 
   const timed = checkpoint(session, now);
   const values = timed.snapshot.values.slice();
-  values[selectedCell] = value;
+  values[cell] = value;
   if (values.every((digit, index) => digit === timed.snapshot.solution[index])) {
     const { gameId, difficulty, elapsedMs } = timed.snapshot;
     return {
@@ -106,5 +107,5 @@ export function updateGame(session: GameSession, action: GameAction, now: number
       completion: { gameId, difficulty, elapsedMs },
     };
   }
-  return { session: { ...timed, snapshot: { ...timed.snapshot, values } }, completion: null };
+  return { session: { ...timed, snapshot: { ...timed.snapshot, selectedCell: cell, values } }, completion: null };
 }

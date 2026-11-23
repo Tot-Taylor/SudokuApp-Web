@@ -215,6 +215,60 @@ test('Eraser stays active across cells, blocks number entry, and saves cleared v
   await fitsViewport(page);
 });
 
+test('Clear All confirms, preserves Eraser mode, and saves the same puzzle with only its clues', async ({ page }) => {
+  const second = snapshot.givens.indexOf(null, firstEmpty + 1);
+  const values = snapshot.values.slice();
+  values[firstEmpty] = 6;
+  values[second] = 7;
+  await seedStorage(page, { ...snapshot, values });
+  const resume = page.getByRole('button', { name: 'Continue Game' });
+  await resume.click();
+  const board = page.getByRole('grid');
+  const entries = board.getByRole('gridcell');
+  const eraser = page.getByRole('button', { name: 'Eraser' });
+  const clear = page.getByRole('main').getByRole('button', { name: 'Clear All', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Clear All Entries?' });
+  const cancel = dialog.getByRole('button', { name: 'Cancel' });
+  const confirm = dialog.getByRole('button', { name: 'Clear All' });
+
+  await eraser.click();
+  await clear.click();
+  await expect(dialog).toHaveAccessibleDescription('This erases all numbers and candidate notes you entered. The original clues will stay.');
+  await expect(cancel).toBeFocused();
+  expect((await readReplica(page)).active?.values).toEqual(values);
+  await page.keyboard.press('Escape');
+  await expect(clear).toBeFocused();
+  await expect(entries.nth(firstEmpty)).toHaveText('6');
+  await expect(entries.nth(second)).toHaveText('7');
+
+  await clear.press('Enter');
+  await cancel.click();
+  await expect(clear).toBeFocused();
+  expect((await readReplica(page)).active?.values).toEqual(values);
+
+  await clear.press('Enter');
+  await confirm.press('Enter');
+  await expect(dialog).toBeHidden();
+  await expect(clear).toBeFocused();
+  await expect(eraser).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('heading', { name: 'Easy puzzle' })).toBeVisible();
+  const clues = snapshot.givens.map((value) => value === null ? '' : String(value));
+  await expect(entries).toHaveText(clues);
+  await expect.poll(async () => (await readReplica(page)).active).toMatchObject({
+    gameId, difficulty: snapshot.difficulty, givens: snapshot.givens, values: snapshot.givens,
+  });
+
+  await clear.click();
+  await confirm.click();
+  await expect(clear).toBeFocused();
+  await expect(entries).toHaveText(clues);
+  await fitsViewport(page);
+  await page.reload();
+  await resume.click();
+  await expect(entries).toHaveText(clues);
+  expect((await readReplica(page)).active?.gameId).toBe(gameId);
+});
+
 test('cancellation and a failed replacement preserve the saved puzzle, and retry can replace it', async ({
   page, context,
 }) => {

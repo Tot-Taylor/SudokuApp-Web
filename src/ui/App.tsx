@@ -15,6 +15,7 @@ import type { Replica } from '../sync/journal.ts';
 type Screen = 'home' | 'game' | 'stats' | 'settings' | 'shop' | 'recovery';
 type Prompt =
   | { type: 'difficulty' | 'complete' }
+  | { type: 'clear-all'; gameId: string }
   | { type: 'replace' | 'generating' | 'generation-error'; difficulty: Difficulty };
 
 const DIGITS = Array.from({ length: 9 }, (_, index) => index + 1);
@@ -161,6 +162,7 @@ export function App() {
   const pending = useRef<AbortController | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const newGameButton = useRef<HTMLButtonElement>(null);
+  const clearAllButton = useRef<HTMLButtonElement>(null);
   const activeGame = view.replica?.active ?? null;
 
   useEffect(() => client.start(setView), [client]);
@@ -191,7 +193,7 @@ export function App() {
     if (result.session !== current) setCurrent(result.session);
     if (result.session.snapshot !== current.snapshot) {
       if (action.type === 'erase') setSelectedGiven(null);
-      const checkpoint = action.type !== 'place' && action.type !== 'erase';
+      const checkpoint = action.type !== 'place' && action.type !== 'erase' && action.type !== 'clear-all';
       const previous = checkpoint && current.snapshot.status === 'active' ? current.snapshot : undefined;
       commit(result.session.snapshot, previous);
     }
@@ -245,6 +247,7 @@ export function App() {
     const snapshot = current.snapshot;
     if (!activeGame || activeGame.gameId !== snapshot.gameId) {
       setCurrent(null);
+      setPrompt(null);
       setNotice(activeGame ? 'The shared game changed. Continue to open the latest puzzle.'
         : 'That puzzle is no longer active.');
       setScreen('home');
@@ -277,8 +280,9 @@ export function App() {
     pending.current?.abort();
     pending.current = null;
     setPrompt(null);
+    const focusTarget = prompt?.type === 'clear-all' ? clearAllButton : screen === 'home' ? newGameButton : heading;
     requestAnimationFrame(() => {
-      (screen === 'home' ? newGameButton.current : heading.current)?.focus({ preventScroll: true });
+      focusTarget.current?.focus({ preventScroll: true });
     });
   }
 
@@ -413,9 +417,15 @@ export function App() {
             <GameBoard key={snapshot.gameId} snapshot={snapshot} selectedCell={selectedCell} eraserActive={eraserActive}
               onSelect={selectCell} onAction={act} />
             <div className="board-tools">
-              <button type="button" className="button secondary erase-button"
-                aria-pressed={eraserActive} disabled={!isPlaying}
-                onClick={() => setEraserEnabled((enabled) => !enabled)}>Eraser</button>
+              <div className="board-actions">
+                <button type="button" className="button secondary erase-button"
+                  aria-pressed={eraserActive} disabled={!isPlaying}
+                  onClick={() => setEraserEnabled((enabled) => !enabled)}>Eraser</button>
+                <button type="button" className="button secondary clear-all-button" ref={clearAllButton}
+                  disabled={!isPlaying} onClick={() => setPrompt({ type: 'clear-all', gameId: snapshot.gameId })}>
+                  Clear All
+                </button>
+              </div>
               <p id="keyboard-help" className="keyboard-help">{eraserActive
                 ? 'Arrow keys move · Enter, Space or Delete erases'
                 : 'Arrow keys move · 1–9 enter · Delete erases'}</p>
@@ -478,6 +488,18 @@ export function App() {
           <div className="dialog-actions">
             <button type="button" className="button secondary" data-initial-focus onClick={dismissPrompt}>Cancel</button>
             <button type="button" className="button primary" onClick={() => void generate(prompt.difficulty)}>Start New</button>
+          </div>
+        </Dialog>
+      )}
+      {prompt?.type === 'clear-all' && snapshot?.gameId === prompt.gameId && isPlaying && (
+        <Dialog title="Clear All Entries?" description="This erases all numbers and candidate notes you entered. The original clues will stay."
+          onDismiss={dismissPrompt}>
+          <div className="dialog-actions">
+            <button type="button" className="button secondary" data-initial-focus onClick={dismissPrompt}>Cancel</button>
+            <button type="button" className="button primary" onClick={() => {
+              if (sessionRef.current?.snapshot.gameId === prompt.gameId) act({ type: 'clear-all' });
+              dismissPrompt();
+            }}>Clear All</button>
           </div>
         </Dialog>
       )}

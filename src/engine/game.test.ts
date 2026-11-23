@@ -49,6 +49,27 @@ test('erasing a specific cell clears and selects it in one update, while invalid
   assert.equal(clockRunning.snapshot.values[firstEmpty], 3);
 });
 
+test('Clear All restores clues in one update and preserves the game and clock', () => {
+  const fresh = startGame(puzzle, gameId);
+  const otherEmpty = puzzle.givens.indexOf(null, firstEmpty + 1);
+  let session = updateGame(fresh, { type: 'foreground', active: true }, 10).session;
+  session = updateGame(session, { type: 'select', cell: firstEmpty }, 20).session;
+  session = updateGame(session, { type: 'place', digit: 3 }, 30).session;
+  session = updateGame(session, { type: 'select', cell: otherEmpty }, 40).session;
+  session = updateGame(session, { type: 'place', digit: 4 }, 50).session;
+
+  const action = { type: 'clear-all' } as const;
+  const cleared = updateGame(session, action, 60);
+  assert.deepEqual(cleared, {
+    session: { ...session, snapshot: { ...session.snapshot, values: puzzle.givens } },
+    completion: null,
+  });
+  assert.equal(session.snapshot.values[firstEmpty], 3);
+  assert.equal(session.snapshot.values[otherEmpty], 4);
+  assert.equal(updateGame(cleared.session, action, 70).session, cleared.session);
+  assert.equal(updateGame(cleared.session, { type: 'checkpoint' }, 80).session.snapshot.elapsedMs, 70);
+});
+
 test('clock excludes hidden time and restores selection, board and elapsed time on a fresh clock', () => {
   let session = startGame(puzzle, gameId);
   session = updateGame(session, { type: 'foreground', active: true }, 100.5).session;

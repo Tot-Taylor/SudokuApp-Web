@@ -9,10 +9,6 @@ const ROWS = Array.from({ length: SIDE }, (_, row) => CELLS.slice(row * SIDE, (r
 const SAMPLE = Array.from('530070000600195000098000060800060003400803001700020006060000280000419005000080079',
   (digit) => Number(digit) || null);
 
-function CellValue({ value }: { value: number | null | undefined }) {
-  return value ?? <span className="blank-heart" aria-hidden="true">♥</span>;
-}
-
 export function BoardPreview({ snapshot }: { snapshot: GameSnapshot | null }) {
   const givens: Board = snapshot?.givens ?? SAMPLE;
   const values: Board = snapshot?.values ?? SAMPLE;
@@ -21,9 +17,8 @@ export function BoardPreview({ snapshot }: { snapshot: GameSnapshot | null }) {
       {ROWS.map((row, index) => (
         <div className="grid-row" key={index}>
           {row.map((cell) => (
-            <div className="grid-cell" key={cell.index} data-given={givens[cell.index] !== null}
-              data-empty={values[cell.index] === null}>
-              <CellValue value={values[cell.index]} />
+            <div className="grid-cell" key={cell.index} data-given={givens[cell.index] !== null}>
+              {values[cell.index]}
             </div>
           ))}
         </div>
@@ -45,7 +40,6 @@ export function GameBoard({
   const { givens, values, selectedCell, status } = snapshot;
   const [focusIndex, setFocusIndex] = useState(() => selectedCell ?? givens.indexOf(null));
   const cellRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const selected = selectedCell === null ? undefined : CELLS[selectedCell];
 
   function select(index: number) {
     if (status === 'active' && givens[index] === null) onAction({ type: 'select', cell: index });
@@ -97,8 +91,6 @@ export function GameBoard({
             const value = values[cell.index];
             const isGiven = givens[cell.index] !== null;
             const isSelected = cell.index === selectedCell;
-            const inBand = selected !== undefined
-              && (selected.row === cell.row || selected.column === cell.column);
             const label = `Row ${cell.row + 1}, column ${cell.column + 1}, ${value ?? 'empty'}${isGiven ? ', given' : ''}`;
             return (
               <div
@@ -111,13 +103,11 @@ export function GameBoard({
                 aria-selected={isSelected}
                 aria-readonly={isGiven || status === 'solved'}
                 data-given={isGiven}
-                data-empty={value === null}
-                data-band={inBand}
                 onFocus={() => setFocusIndex(cell.index)}
                 onClick={() => { moveFocus(cell.index); }}
                 onKeyDown={(event) => handleKey(event, cell.index)}
               >
-                <CellValue value={value} />
+                {value}
               </div>
             );
           })}

@@ -192,7 +192,7 @@ h1[tabindex="-1"]:focus { outline: none; }
   border: 2px solid #95697d;
   border-radius: 0.5625rem;
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
   font-size: clamp(0.875rem, 4.5vw, 1.35rem);
   user-select: none;
 }
@@ -204,8 +204,8 @@ h1[tabindex="-1"]:focus { outline: none; }
   min-inline-size: 0;
   border-inline-end: 1px solid #d5b9c7;
   border-block-end: 1px solid #d5b9c7;
-  background: #f4e6f4;
-  color: var(--ink);
+  background: var(--surface);
+  color: #000;
   font-variant-numeric: tabular-nums;
   touch-action: manipulation;
 }
@@ -213,16 +213,12 @@ h1[tabindex="-1"]:focus { outline: none; }
 .grid-row:last-child .grid-cell { border-block-end: 0; }
 .grid-cell:nth-child(3n):not(:last-child) { border-inline-end: 2px solid #95697d; }
 .grid-row:nth-child(3n):not(:last-child) .grid-cell { border-block-end: 2px solid #95697d; }
-.grid-cell[data-given="true"] { background: #f8e0e9; color: #943353; font-weight: 720; }
-.grid-cell[data-empty="true"] { background: #fff8e6; }
-.grid-cell[data-band="true"] { background: #f7ddf4; }
+.grid-cell[data-given="true"] { background: #e8e8e8; font-weight: 720; }
 .grid-cell[aria-selected="true"] {
-  background: #f1bde9;
   box-shadow: inset 0 0 0 2px #ad289d;
 }
 .grid-cell[aria-readonly="false"] { cursor: pointer; }
 .grid-cell:focus-visible { outline-offset: -4px; outline-color: #562349; z-index: 1; }
-.blank-heart { font-size: 0.6875rem; color: #8d6b24; }
 
 .board-tools { display: flex; justify-content: space-between; align-items: center; gap: 0.625rem; margin-block: 0.75rem; }
 .erase-button { min-block-size: 44px; padding-inline: 0.875rem; font-size: 0.9375rem; }
@@ -257,9 +253,9 @@ h1[tabindex="-1"]:focus { outline: none; }
 .empty-note { color: var(--muted); margin-block-end: 1rem; line-height: 1.5; }
 .install-settings h2 { font-size: 1.15rem; margin-block-end: 0.625rem; }
 .install-settings p { margin-block-end: 0.75rem; color: var(--muted); line-height: 1.5; }
-.stats-table { inline-size: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.stats-table { inline-size: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .stats-table th, .stats-table td { padding: 0.75rem 0.25rem; text-align: end; border-block-end: 1px solid var(--line); }
-.stats-table thead th { color: var(--muted); font-size: 0.875rem; white-space: nowrap; }
+.stats-table thead th { color: var(--muted); font-size: 0.875rem; }
 .stats-table th:first-child { text-align: start; }
 .stats-table abbr { text-decoration: none; }
 

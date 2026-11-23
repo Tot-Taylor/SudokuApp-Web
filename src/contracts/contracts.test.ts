@@ -58,6 +58,21 @@ test('snapshots reject malformed boards and modified or selected givens', () => 
   assert.equal(gameSnapshotSchema.safeParse({ ...game, elapsedMs: -1 }).success, false);
 });
 
+test('candidate notes round-trip independently of entries and are forbidden on clues', () => {
+  const candidateNotes = givens.map((_, index) => index === 40 ? 0b010000101 : 0);
+  const { status, ...gameFields } = game;
+  const activeWithNotes = { ...gameFields, status, candidateNotes };
+  assert.equal(activeWithNotes.values[40], 5);
+  // Mutation retries compare serialized payloads with receipts recorded by earlier releases.
+  const saved = JSON.stringify(activeWithNotes);
+  assert.equal(JSON.stringify(gameSnapshotSchema.parse(JSON.parse(saved))), saved);
+  assert.deepEqual(gameSnapshotSchema.parse({ ...solved, candidateNotes }), { ...solved, candidateNotes });
+  const notesOnGiven = [1, ...candidateNotes.slice(1)];
+  assert.equal(gameSnapshotSchema.safeParse({ ...game, candidateNotes: notesOnGiven }).success, false);
+  const invalidMask = candidateNotes.map((mask, index) => index === 40 ? 512 : mask);
+  assert.equal(gameSnapshotSchema.safeParse({ ...game, candidateNotes: invalidMask }).success, false);
+});
+
 test('a solved snapshot must match the solution and an active snapshot must remain unfinished', () => {
   assert.equal(gameSnapshotSchema.safeParse({ ...game, status: 'solved' }).success, false);
   assert.equal(gameSnapshotSchema.safeParse({ ...solved, status: 'active' }).success, false);

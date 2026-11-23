@@ -344,6 +344,111 @@ test('Undo reverses edits and Clear All after reload and starts empty for a new 
   }).toBe(true);
 });
 
+test('candidate mode positions and saves notes, hides them under values, and supports Undo', async ({ page }) => {
+  await seedStorage(page, snapshot);
+  const continueGame = page.getByRole('button', { name: 'Continue Game' });
+  await continueGame.click();
+  const board = page.getByRole('grid', { name: 'Sudoku board' });
+  const cells = board.getByRole('gridcell');
+  const cell = cells.nth(firstEmpty);
+  const peerIndex = snapshot.givens.findIndex((value, index) => value === null && index !== firstEmpty
+    && Math.floor(index / 9) === Math.floor(firstEmpty / 9));
+  const peer = cells.nth(peerIndex);
+  const given = board.locator('[data-given="true"]').first();
+  const mode = page.getByRole('group', { name: 'Input mode' });
+  const normal = mode.getByRole('button', { name: 'Normal' });
+  const candidate = mode.getByRole('button', { name: 'Candidate' });
+  const keypad = page.getByRole('group', { name: 'Number pad' });
+  const key = (digit: number) => keypad.getByRole('button', { name: String(digit), exact: true });
+  const undo = page.getByRole('button', { name: 'Undo' });
+  const marks = cell.locator('.candidate-marks');
+  const normalFontSize = await key(1).evaluate((button) => parseFloat(getComputedStyle(button).fontSize));
+  const cellFontSize = await cell.evaluate((target) => parseFloat(getComputedStyle(target).fontSize));
+  const cellSize = await cell.boundingBox();
+
+  await expect(normal).toHaveAttribute('aria-pressed', 'true');
+  await candidate.click();
+  await expect(normal).toHaveAttribute('aria-pressed', 'false');
+  await expect(candidate).toHaveAttribute('aria-pressed', 'true');
+  const [modeBounds, keypadBounds] = await Promise.all([mode.boundingBox(), keypad.boundingBox()]);
+  expect(modeBounds!.y + modeBounds!.height).toBeLessThan(keypadBounds!.y);
+  expect(await key(1).evaluate((button) => parseFloat(getComputedStyle(button).fontSize))).toBeLessThan(normalFontSize);
+  expect((await key(1).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await given.click();
+  await expect(key(1)).toBeDisabled();
+  await given.press('1');
+  await expect(given.locator('.candidate-marks')).toHaveCount(0);
+  await expect(undo).toBeDisabled();
+
+  await cell.click();
+  await key(1).click();
+  await key(3).click();
+  await cell.press('8');
+  await expect(cell).toHaveAccessibleName(/empty, candidates 1, 3, 8$/);
+  await expect(cell).toHaveAttribute('data-highlight', 'selected');
+  await expect(peer).toHaveAttribute('data-highlight', 'peer');
+  await expect(board.locator('[aria-invalid="true"]')).toHaveCount(0);
+  await expect(marks).toHaveCSS('color', 'rgb(0, 0, 0)');
+  await expect(marks).toHaveCSS('border-top-width', '0px');
+  expect(await marks.evaluate((target) => parseFloat(getComputedStyle(target).fontSize))).toBeLessThan(cellFontSize * 0.65);
+  const slots = marks.locator('span');
+  await expect(slots).toHaveText(['1', '', '3', '', '', '', '', '8', '']);
+  const [topLeft, topRight, bottomMiddle] = await Promise.all([0, 2, 7].map((index) => slots.nth(index).boundingBox()));
+  expect(topLeft!.x).toBeLessThan(bottomMiddle!.x);
+  expect(bottomMiddle!.x).toBeLessThan(topRight!.x);
+  expect(topLeft!.y).toBeCloseTo(topRight!.y, 0);
+  expect(bottomMiddle!.y).toBeGreaterThan(topLeft!.y);
+  expect(await cell.boundingBox()).toMatchObject({ width: cellSize!.width, height: cellSize!.height });
+  expect((await readReplica(page)).active?.values[firstEmpty]).toBe(null);
+
+  await expect(key(3)).toHaveAttribute('aria-pressed', 'true');
+  await key(3).click();
+  await expect(cell).toHaveAccessibleName(/empty, candidates 1, 8$/);
+  await expect(key(3)).toHaveAttribute('aria-pressed', 'false');
+  await undo.click();
+  await expect(cell).toHaveAccessibleName(/empty, candidates 1, 3, 8$/);
+
+  await normal.click();
+  await expect(cell).toHaveAccessibleName(/empty, candidates 1, 3, 8$/);
+  await peer.click();
+  await key(1).click();
+  await expect(peer).toHaveText('1');
+  await expect(cell).toHaveAccessibleName(/empty, candidates 1, 3, 8$/);
+  await expect(cell).not.toHaveAttribute('aria-invalid', 'true');
+  await expect(cell).not.toHaveAttribute('data-highlight', 'match');
+  await cell.click();
+  await key(5).click();
+  await expect(cell).toHaveText('5');
+  await expect(marks).toHaveCount(0);
+  await candidate.click();
+  await expect(key(3)).toBeDisabled();
+  await cell.press('3');
+  await expect(cell).toHaveText('5');
+  await expect.poll(async () => {
+    const game = (await readReplica(page)).active;
+    return [game?.values[firstEmpty], game?.candidateNotes?.[firstEmpty]];
+  }).toEqual([5, 0b010000101]);
+
+  await page.reload();
+  await continueGame.click();
+  await expect(candidate).toHaveAttribute('aria-pressed', 'true');
+  await expect(cell).toHaveText('5');
+  await expect(peer).toHaveText('1');
+  await expect(key(3)).toBeDisabled();
+  const eraser = page.getByRole('button', { name: 'Eraser' });
+  await eraser.click();
+  await cell.click();
+  await expect(cell).toHaveAccessibleName(/empty, candidates 1, 3, 8$/);
+  await eraser.click();
+  await expect(candidate).toHaveAttribute('aria-pressed', 'true');
+  await expect(key(3)).toHaveAttribute('aria-pressed', 'true');
+  await cell.press('Delete');
+  await expect(cell).toBeEmpty();
+  await undo.click();
+  await expect(cell).toHaveAccessibleName(/empty, candidates 1, 3, 8$/);
+  await fitsViewport(page);
+});
+
 test('duplicate dots follow entry, replacement, restored progress, erasure, and Clear All', async ({ page }) => {
   await seedStorage(page, snapshot);
   const resume = page.getByRole('button', { name: 'Continue Game' });

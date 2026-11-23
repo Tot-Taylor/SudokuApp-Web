@@ -9,9 +9,7 @@ export const cellIndexSchema = z.int().min(0).max(CELL_COUNT - 1);
 const candidateMaskSchema = z.int().min(0).max(0b111111111);
 export const candidateNotesSchema = z.array(candidateMaskSchema).length(CELL_COUNT);
 
-const cellStateSchema = z.tuple([digitSchema.nullable(), candidateMaskSchema]).refine(
-  ([value, notes]) => value === null || notes === EMPTY_CANDIDATES,
-);
+const cellStateSchema = z.tuple([digitSchema.nullable(), candidateMaskSchema]);
 const cellChangeSchema = z.strictObject({
   index: cellIndexSchema,
   before: cellStateSchema,

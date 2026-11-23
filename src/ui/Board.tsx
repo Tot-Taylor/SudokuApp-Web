@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { GameSnapshot } from '../contracts/game.ts';
-import { CELLS, SIDE, conflictingCells } from '../engine/board.ts';
+import { CELLS, DIGITS, SIDE, conflictingCells, digitBit } from '../engine/board.ts';
 import type { Board } from '../engine/board.ts';
 import type { GameAction } from '../engine/game.ts';
 import { cellHighlight } from './cell-highlight.ts';
@@ -33,15 +33,16 @@ const ARROW_OFFSET: Readonly<Record<string, readonly [number, number]>> = {
 };
 
 export function GameBoard({
-  snapshot, selectedCell, eraserActive, onSelect, onAction,
+  snapshot, selectedCell, eraserActive, onSelect, onDigit, onAction,
 }: {
   snapshot: GameSnapshot;
   selectedCell: number | null;
   eraserActive: boolean;
   onSelect: (index: number) => void;
+  onDigit: (digit: number) => void;
   onAction: (action: GameAction) => void;
 }) {
-  const { givens, values, status } = snapshot;
+  const { givens, values, candidateNotes, status } = snapshot;
   const conflicts = conflictingCells(values);
   const [focusIndex, setFocusIndex] = useState(() => selectedCell ?? givens.indexOf(null));
   const cellRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -87,7 +88,7 @@ export function GameBoard({
       event.preventDefault();
       if (eraserActive) return;
       onSelect(index);
-      onAction({ type: 'place', digit: Number(event.key) });
+      onDigit(Number(event.key));
     } else if (event.key === 'Backspace' || event.key === 'Delete') {
       event.preventDefault();
       if (!eraserActive) onSelect(index);
@@ -105,7 +106,10 @@ export function GameBoard({
             const isGiven = givens[cell.index] !== null;
             const hasConflict = conflicts.has(cell.index);
             const highlight = cellHighlight(values, selectedCell, cell.index);
-            const label = `Row ${cell.row + 1}, column ${cell.column + 1}, ${value ?? 'empty'}${isGiven ? ', given' : ''}`;
+            const notes = value === null ? candidateNotes?.[cell.index] : undefined;
+            const candidates = notes ? DIGITS.filter((digit) => notes & digitBit(digit)) : null;
+            const contents = candidates ? `empty, candidates ${candidates.join(', ')}` : value ?? 'empty';
+            const label = `Row ${cell.row + 1}, column ${cell.column + 1}, ${contents}${isGiven ? ', given' : ''}`;
             return (
               <div
                 className="grid-cell"
@@ -127,7 +131,11 @@ export function GameBoard({
                 }}
                 onKeyDown={(event) => handleKey(event, cell.index)}
               >
-                {value}
+                {candidates ? (
+                  <span className="candidate-marks" aria-hidden="true">
+                    {DIGITS.map((digit) => <span key={digit}>{candidates.includes(digit) ? digit : null}</span>)}
+                  </span>
+                ) : value}
               </div>
             );
           })}

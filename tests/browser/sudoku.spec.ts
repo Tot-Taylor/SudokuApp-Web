@@ -88,7 +88,7 @@ test('starts a puzzle, plays with touch controls and the keyboard, and resumes a
   await cell.press('Delete');
   await expect(cell).toHaveAccessibleName(`${coordinates}, empty`);
   await expect(cell).toBeEmpty();
-  await expect(cell).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(cell).toHaveCSS('background-color', 'rgb(255, 232, 163)');
   await cell.press('4');
   await expect(cell).toHaveAccessibleName(`${coordinates}, 4`);
 
@@ -110,6 +110,46 @@ test('starts a puzzle, plays with touch controls and the keyboard, and resumes a
   await expect(cell).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(board.locator('[tabindex="0"]')).toBeFocused();
+});
+
+test('highlights Sudoku peers and matching givens and entries without making givens editable', async ({ page }) => {
+  await seedStorage(page, snapshot);
+  await page.getByRole('button', { name: 'Continue Game' }).click();
+  const board = page.getByRole('grid', { name: 'Sudoku board' });
+  const entry = board.getByRole('gridcell').nth(firstEmpty);
+  const given = board.getByRole('gridcell', { name: /, 5, given$/ }).first();
+  const five = page.getByRole('group', { name: 'Number pad' }).getByRole('button', { name: '5' });
+  const peers = board.locator('[data-highlight="peer"]');
+  const matches = board.locator('[data-highlight="match"]');
+
+  await entry.click();
+  await expect(peers).toHaveCount(20);
+  await expect(peers.first()).toHaveCSS('background-color', 'rgb(255, 244, 204)');
+  await expect(matches).toHaveCount(0);
+  await expect(entry).toHaveCSS('box-shadow', /rgb\(217, 149, 0\)/);
+  await expect(board.locator('[data-given="false"]:not([data-highlight])').first())
+    .toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(board.locator('[data-given="true"]:not([data-highlight])').first())
+    .toHaveCSS('background-color', 'rgb(232, 232, 232)');
+  await five.click();
+  await expect(given).toHaveCSS('background-color', 'rgb(255, 217, 128)');
+  await expect(given).toHaveCSS('color', 'rgb(0, 0, 0)');
+
+  await given.click();
+  await given.click();
+  await expect(given).toHaveAttribute('aria-selected', 'true');
+  await expect(given).toHaveAttribute('aria-readonly', 'true');
+  await expect(given).toHaveCSS('background-color', 'rgb(255, 232, 163)');
+  await expect(entry).toHaveCSS('background-color', 'rgb(255, 217, 128)');
+  await expect(entry).toHaveCSS('color', 'rgb(0, 0, 0)');
+  await expect(five).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Eraser' })).toBeDisabled();
+
+  await entry.click();
+  await entry.press('Delete');
+  await expect(matches).toHaveCount(0);
+  await expect(five).toBeEnabled();
+  await fitsViewport(page);
 });
 
 test('cancellation and a failed replacement preserve the saved puzzle, and retry can replace it', async ({

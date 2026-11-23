@@ -226,6 +226,17 @@ h1[tabindex="-1"]:focus { outline: none; }
 }
 .board[aria-readonly="false"] .grid-cell { cursor: pointer; }
 .grid-cell:focus-visible { outline-offset: -4px; outline-color: #562349; z-index: 1; }
+.grid-cell[aria-invalid="true"]::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 3px;
+  inset-inline-end: 3px;
+  inline-size: 5px;
+  block-size: 5px;
+  border-radius: 50%;
+  background: #b42318;
+  pointer-events: none;
+}
 
 .board-tools { display: flex; justify-content: space-between; align-items: center; gap: 0.625rem; margin-block: 0.75rem; }
 .board-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }

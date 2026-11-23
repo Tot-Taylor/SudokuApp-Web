@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { GameSnapshot } from '../contracts/game.ts';
-import { CELLS, SIDE } from '../engine/board.ts';
+import { CELLS, SIDE, conflictingCells } from '../engine/board.ts';
 import type { Board } from '../engine/board.ts';
 import type { GameAction } from '../engine/game.ts';
 import { cellHighlight } from './cell-highlight.ts';
@@ -42,6 +42,7 @@ export function GameBoard({
   onAction: (action: GameAction) => void;
 }) {
   const { givens, values, status } = snapshot;
+  const conflicts = conflictingCells(values);
   const [focusIndex, setFocusIndex] = useState(() => selectedCell ?? givens.indexOf(null));
   const cellRefs = useRef<Array<HTMLDivElement | null>>([]);
 
@@ -102,6 +103,7 @@ export function GameBoard({
           {row.map((cell) => {
             const value = values[cell.index];
             const isGiven = givens[cell.index] !== null;
+            const hasConflict = conflicts.has(cell.index);
             const highlight = cellHighlight(values, selectedCell, cell.index);
             const label = `Row ${cell.row + 1}, column ${cell.column + 1}, ${value ?? 'empty'}${isGiven ? ', given' : ''}`;
             return (
@@ -114,6 +116,8 @@ export function GameBoard({
                 aria-label={label}
                 aria-selected={highlight === 'selected'}
                 aria-readonly={isGiven || status === 'solved'}
+                aria-invalid={hasConflict || undefined}
+                aria-description={hasConflict ? 'Duplicate number in its row, column, or box.' : undefined}
                 data-given={isGiven}
                 data-highlight={highlight}
                 onFocus={() => setFocusIndex(cell.index)}

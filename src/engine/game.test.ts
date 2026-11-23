@@ -120,8 +120,16 @@ test('candidate toggles, erase, placement and Clear All share the same persisted
   const erased = apply({ type: 'erase' });
   assert.deepEqual(apply({ type: 'undo' }), removed);
   const placed = apply({ type: 'place', digit: 7 });
-  assert.ok(placed.status === 'active');
-  assert.equal(placed.candidateNotes, undefined);
+  assert.equal(placed.candidateNotes?.[firstEmpty], removed.candidateNotes?.[firstEmpty]);
+  assert.equal(apply({ type: 'toggle-candidate', digit: 3 }), placed);
+  const replaced = apply({ type: 'place', digit: 8 });
+  assert.equal(replaced.values[firstEmpty], 8);
+  assert.equal(replaced.candidateNotes?.[firstEmpty], removed.candidateNotes?.[firstEmpty]);
+  const erasedValue = apply({ type: 'erase' });
+  assert.equal(erasedValue.values[firstEmpty], null);
+  assert.equal(erasedValue.candidateNotes?.[firstEmpty], removed.candidateNotes?.[firstEmpty]);
+  assert.deepEqual(apply({ type: 'undo' }), replaced);
+  assert.deepEqual(apply({ type: 'undo' }), placed);
   assert.deepEqual(apply({ type: 'undo' }), removed);
   apply({ type: 'place', digit: 7 });
   apply({ type: 'select', cell: otherEmpty });
@@ -232,12 +240,17 @@ test('the last correct placement freezes the board and emits only one completion
   });
   assert.ok(almost);
   const running = updateGame(almost, { type: 'foreground', active: true }, 50).session;
-  const wrong = updateGame(running, { type: 'place', digit: finalDigit % 9 + 1 }, 100);
+  const note = updateGame(running, { type: 'toggle-candidate', digit: finalDigit }, 75);
+  assert.equal(note.session.snapshot.status, 'active');
+  assert.equal(note.session.snapshot.values[firstEmpty], null);
+  assert.equal(note.completion, null);
+  const wrong = updateGame(note.session, { type: 'place', digit: finalDigit % 9 + 1 }, 100);
   assert.equal(wrong.session.snapshot.status, 'active');
   assert.equal(wrong.completion, null);
 
   const solved = updateGame(wrong.session, { type: 'place', digit: finalDigit }, 350);
   assert.equal(solved.session.snapshot.status, 'solved');
+  assert.equal(solved.session.snapshot.candidateNotes?.[firstEmpty], note.session.snapshot.candidateNotes?.[firstEmpty]);
   assert.equal(solved.session.runningSince, null);
   assert.deepEqual(completionSchema.parse(solved.completion), { gameId, difficulty: 'easy', elapsedMs: 2300 });
   assert.deepEqual(updateGame(solved.session, { type: 'erase' }, 500), { session: solved.session, completion: null });

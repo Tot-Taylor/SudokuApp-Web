@@ -1,5 +1,6 @@
 export const SIDE = 9;
 export const CELL_COUNT = SIDE * SIDE;
+export const DIGITS = Array.from({ length: SIDE }, (_, index) => index + 1);
 export const ALL_DIGITS = (1 << SIDE) - 1;
 
 export type Board = readonly (number | null)[];

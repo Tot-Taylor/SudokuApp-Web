@@ -237,12 +237,26 @@ h1[tabindex="-1"]:focus { outline: none; }
   background: #b42318;
   pointer-events: none;
 }
+.candidate-marks {
+  position: absolute;
+  inset: 1px;
+  display: grid;
+  grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr));
+  place-items: center;
+  color: #000;
+  font-size: clamp(0.5rem, 2.5vw, 0.75rem);
+  line-height: 1;
+  pointer-events: none;
+}
 
 .board-tools { display: flex; justify-content: space-between; align-items: center; gap: 0.625rem; margin-block: 0.75rem; }
 .board-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .board-actions .button { min-block-size: 44px; padding-inline: 0.875rem; font-size: 0.9375rem; }
 .secondary.erase-button[aria-pressed="true"] { background: var(--accent-dark); color: white; }
 .keyboard-help { color: var(--muted); font-size: 0.8125rem; text-align: end; }
+.input-mode { display: flex; gap: 0.5rem; margin-block-end: 0.5rem; }
+.input-mode .button { min-block-size: 44px; font-size: 0.9375rem; }
+.input-mode .button[aria-pressed="true"]:not(:disabled) { background: var(--accent-dark); color: white; }
 .keypad { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: clamp(3px, 1vw, 7px); }
 .keypad button {
   min-block-size: 44px;
@@ -257,6 +271,9 @@ h1[tabindex="-1"]:focus { outline: none; }
 }
 .keypad button:hover:not(:disabled) { background: #f7dce9; }
 .keypad button:disabled { color: #7b6470; background: #f6f1f4; border-color: #f4ebf0; }
+.keypad[data-input-mode="candidate"] button { font-size: clamp(0.75rem, 3vw, 0.9375rem); }
+.keypad button[aria-pressed="true"] { background: var(--accent-dark); color: white; }
+.keypad button[aria-pressed="true"]:hover { background: var(--accent); }
 .game-footer { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-block-start: 0.875rem; }
 .game-footer .save-message { text-align: end; }
 .sync-status { margin-block-start: 0.625rem; }

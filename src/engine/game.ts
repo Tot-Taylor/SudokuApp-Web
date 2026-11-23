@@ -1,8 +1,8 @@
 import { gameSnapshotSchema, SCHEMA_VERSION } from '../contracts/game.ts';
 import type { ActiveGame, Completion, GameSnapshot } from '../contracts/game.ts';
 import { boardChanges, boardKey, cellState, EMPTY_CANDIDATES, MAX_UNDO_ENTRIES, writeCells } from '../contracts/board-history.ts';
-import type { BoardState, UndoEntry } from '../contracts/board-history.ts';
-import { isCellIndex, isDigit } from './board.ts';
+import type { BoardState, CellState, UndoEntry } from '../contracts/board-history.ts';
+import { digitBit, isCellIndex, isDigit } from './board.ts';
 import { isValidPuzzle } from './generator.ts';
 import type { Puzzle } from './generator.ts';
 
@@ -132,10 +132,20 @@ export function updateGame(session: GameSession, action: GameAction, now: number
   }
 
   const [value, notes] = cellState(game, cell);
-  if (action.type === 'toggle-candidate' && value !== null) return { session, completion: null };
-  const board = action.type === 'toggle-candidate'
-    ? writeCells(game, [[cell, [null, notes ^ (1 << (action.digit - 1))]]])
-    : writeCells(game, [[cell, [action.type === 'erase' ? null : action.digit, EMPTY_CANDIDATES]]]);
+  let nextCell: CellState;
+  switch (action.type) {
+    case 'toggle-candidate':
+      if (value !== null) return { session, completion: null };
+      nextCell = [null, notes ^ digitBit(action.digit)];
+      break;
+    case 'erase':
+      nextCell = [null, value === null ? EMPTY_CANDIDATES : notes];
+      break;
+    case 'place':
+      nextCell = [action.digit, notes];
+      break;
+  }
+  const board = writeCells(game, [[cell, nextCell]]);
   const snapshot = editBoard(game, board);
   if (snapshot === game) return { session, completion: null };
 
@@ -144,7 +154,6 @@ export function updateGame(session: GameSession, action: GameAction, now: number
   if (values.every((digit, index) => digit === solution[index])) {
     const solved = { ...game, elapsedMs, values, status: 'solved' as const };
     delete solved.undoHistory;
-    delete solved.candidateNotes;
     return {
       session: { snapshot: solved, runningSince: null },
       completion: { gameId, difficulty, elapsedMs },

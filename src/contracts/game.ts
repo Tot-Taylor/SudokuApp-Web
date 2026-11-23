@@ -39,7 +39,11 @@ const activeShape = z.strictObject({
   candidateNotes: candidateNotesSchema.optional(),
   undoHistory: undoHistorySchema.optional().catch(undefined),
 });
-const solvedShape = z.strictObject({ ...gameFields, status: z.literal('solved') });
+const solvedShape = z.strictObject({
+  ...gameFields,
+  status: z.literal('solved'),
+  candidateNotes: candidateNotesSchema.optional(),
+});
 
 type SnapshotShape = z.output<typeof activeShape> | z.output<typeof solvedShape>;
 
@@ -51,8 +55,8 @@ function validateSnapshot(game: SnapshotShape, ctx: z.RefinementCtx): void {
     const solution = game.solution[index];
     const value = game.values[index];
 
-    if (game.status === 'active' && game.candidateNotes?.[index] && value !== null) {
-      ctx.addIssue({ code: 'custom', path: ['candidateNotes', index], message: 'Only blank cells can have notes.' });
+    if (given !== null && game.candidateNotes?.[index]) {
+      ctx.addIssue({ code: 'custom', path: ['candidateNotes', index], message: 'A given cannot have candidate notes.' });
     }
 
     if (given === null) {

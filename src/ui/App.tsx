@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { sameGameBoard } from '../contracts/board-history.ts';
 import { DIFFICULTIES, DIFFICULTY_RULES, completionStats } from '../contracts/game.ts';
 import type { ActiveGame, Difficulty, GameSnapshot, Stats } from '../contracts/game.ts';
+import { DIGITS, digitBit } from '../engine/board.ts';
 import { generateInWorker } from '../engine/generate-in-worker.ts';
 import { restoreGame, startGame, updateGame } from '../engine/game.ts';
 import type { GameAction, GameSession } from '../engine/game.ts';
@@ -14,13 +15,21 @@ import { canReapply, replicaStats } from '../sync/journal.ts';
 import type { Replica } from '../sync/journal.ts';
 
 type Screen = 'home' | 'game' | 'stats' | 'settings' | 'shop' | 'recovery';
+type InputMode = 'normal' | 'candidate';
 type Prompt =
   | { type: 'difficulty' | 'complete' }
   | { type: 'clear-all'; gameId: string }
   | { type: 'replace' | 'generating' | 'generation-error'; difficulty: Difficulty };
 
-const DIGITS = Array.from({ length: 9 }, (_, index) => index + 1);
+const INPUT_MODE_KEY = 'sudoku.input-mode';
 const SETTINGS_TEETH = Array.from({ length: 8 }, (_, index) => index);
+
+function loadInputMode(): InputMode {
+  try {
+    if (localStorage.getItem(INPUT_MODE_KEY) === 'candidate') return 'candidate';
+  } catch { /* Use the default when preference storage is unavailable. */ }
+  return 'normal';
+}
 
 function duration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -158,6 +167,7 @@ export function App() {
   const [session, setSession] = useState<GameSession | null>(null);
   const [selectedGiven, setSelectedGiven] = useState<number | null>(null);
   const [eraserEnabled, setEraserEnabled] = useState(false);
+  const [inputMode, setInputMode] = useState(loadInputMode);
   const install = useInstallState();
   const sessionRef = useRef<GameSession | null>(null);
   const pending = useRef<AbortController | null>(null);
@@ -213,6 +223,15 @@ export function App() {
     act({ type: 'select', cell: index });
   }
 
+  function changeInputMode(mode: InputMode) {
+    setInputMode(mode);
+    try { localStorage.setItem(INPUT_MODE_KEY, mode); } catch { /* Keep the mode for this session. */ }
+  }
+
+  function enterDigit(digit: number) {
+    act({ type: inputMode === 'candidate' ? 'toggle-candidate' : 'place', digit });
+  }
+
   useEffect(() => {
     heading.current?.focus({ preventScroll: true });
     window.scrollTo(0, 0);
@@ -243,9 +262,9 @@ export function App() {
   }, [act, screen]);
 
   useEffect(() => {
-    const current = sessionRef.current;
-    if (screen !== 'game' || writes !== 0 || !current || current.snapshot.status !== 'active') return;
-    const snapshot = current.snapshot;
+    // A newer local edit can update the ref before this render's save status catches up.
+    if (screen !== 'game' || writes !== 0 || sessionRef.current !== session || session?.snapshot.status !== 'active') return;
+    const snapshot = session.snapshot;
     if (!activeGame || activeGame.gameId !== snapshot.gameId) {
       setCurrent(null);
       setPrompt(null);
@@ -263,7 +282,7 @@ export function App() {
         type: 'foreground', active: document.visibilityState === 'visible' && document.hasFocus(),
       }, performance.now()).session);
     }
-  }, [activeGame, screen, setCurrent, writes]);
+  }, [activeGame, screen, session, setCurrent, writes]);
 
   useEffect(() => () => pending.current?.abort(), []);
 
@@ -328,7 +347,10 @@ export function App() {
   const selectedCell = selectedGiven ?? snapshot?.selectedCell ?? null;
   const isPlaying = snapshot?.status === 'active';
   const eraserActive = isPlaying && eraserEnabled;
-  const canEnter = isPlaying && !eraserActive && selectedGiven === null && snapshot.selectedCell !== null;
+  const candidateMode = inputMode === 'candidate';
+  const canEnter = isPlaying && !eraserActive && selectedGiven === null && selectedCell !== null
+    && (!candidateMode || snapshot.values[selectedCell] === null);
+  const selectedNotes = selectedCell === null ? 0 : snapshot?.candidateNotes?.[selectedCell] ?? 0;
   const saveStatus = <SaveStatus view={view} saving={gameWrites > 0}
     onRetry={() => client.retry()} onReview={() => navigate('recovery')} />;
   const offlineStatus = {
@@ -416,7 +438,7 @@ export function App() {
               )}
             </div>
             <GameBoard key={snapshot.gameId} snapshot={snapshot} selectedCell={selectedCell} eraserActive={eraserActive}
-              onSelect={selectCell} onAction={act} />
+              onSelect={selectCell} onDigit={enterDigit} onAction={act} />
             <div className="board-tools">
               <div className="board-actions">
                 <button type="button" className="button secondary erase-button"
@@ -430,14 +452,21 @@ export function App() {
                   Clear All
                 </button>
               </div>
-              <p id="keyboard-help" className="keyboard-help">{eraserActive
-                ? 'Arrow keys move · Enter, Space or Delete erases'
-                : 'Arrow keys move · 1–9 enter · Delete erases'}</p>
+              <p id="keyboard-help" className="keyboard-help">Arrow keys move · {eraserActive
+                ? 'Enter, Space or Delete erases'
+                : `${candidateMode ? '1–9 toggle notes' : '1–9 enter'} · Delete erases`}</p>
             </div>
-            <div className="keypad" role="group" aria-label="Number pad">
+            <div className="input-mode" role="group" aria-label="Input mode">
+              <button type="button" className="button secondary" disabled={!isPlaying}
+                aria-pressed={!candidateMode} onClick={() => changeInputMode('normal')}>Normal</button>
+              <button type="button" className="button secondary" disabled={!isPlaying}
+                aria-pressed={candidateMode} onClick={() => changeInputMode('candidate')}>Candidate</button>
+            </div>
+            <div className="keypad" role="group" aria-label="Number pad" data-input-mode={inputMode}>
               {DIGITS.map((digit) => (
                 <button type="button" key={digit} disabled={!canEnter}
-                  onClick={() => act({ type: 'place', digit })}>{digit}</button>
+                  aria-pressed={candidateMode ? canEnter && Boolean(selectedNotes & digitBit(digit)) : undefined}
+                  onClick={() => enterDigit(digit)}>{digit}</button>
               ))}
             </div>
             <div className="game-footer">

@@ -116,16 +116,20 @@ test('offline changes survive reload and a fresh commit wins across two devices'
   }
 });
 
-test('a fresh device can undo synced edits and sync the restored board', async ({ app, page, browser }) => {
+test('a fresh device can undo synced entries and reveal their saved candidate notes', async ({ app, page, browser }) => {
   const game = puzzle(21);
   const cell = game.givens.indexOf(null);
   save(app.db, { kind: 'save-game', game });
   await page.goto(app.url);
   await openGame(page);
+  await page.getByRole('button', { name: 'Candidate', exact: true }).click();
+  await page.getByRole('gridcell').nth(cell).press('8');
+  await page.getByRole('button', { name: 'Normal', exact: true }).click();
   await place(page, cell, 4);
   await place(page, cell, 5);
   await expect(page.getByRole('status')).toHaveText('Synced');
-  expect(readState(app.db).activeGame?.undoHistory?.entries).toHaveLength(2);
+  expect(readState(app.db).activeGame?.undoHistory?.entries).toHaveLength(3);
+  expect(readState(app.db).activeGame?.candidateNotes?.[cell]).toBe(0b010000000);
 
   const device = await browser.newContext();
   try {
@@ -136,8 +140,12 @@ test('a fresh device can undo synced edits and sync the restored board', async (
     await undo.click();
     await expect.poll(() => readState(app.db).activeGame?.values[cell]).toBe(4);
     await undo.click();
-    await expect(undo).toBeDisabled();
+    await expect(other.getByRole('gridcell').nth(cell)).toHaveAccessibleName(/empty, candidates 8$/);
     await expect.poll(() => readState(app.db).activeGame?.values[cell]).toBe(null);
+    await undo.click();
+    await expect(undo).toBeDisabled();
+    await expect(other.getByRole('gridcell').nth(cell)).toBeEmpty();
+    await expect.poll(() => readState(app.db).activeGame?.candidateNotes).toBeUndefined();
     expect(readState(app.db).activeGame?.undoHistory).toBeUndefined();
   } finally {
     await device.close();

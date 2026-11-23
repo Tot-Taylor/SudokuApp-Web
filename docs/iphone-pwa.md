@@ -24,7 +24,7 @@ For a frontend rollback, serve the previous complete build at the same HTTPS ori
 
 Record the exact iPhone model, iOS version, and results when the private HTTPS address is ready.
 
-- [ ] Add Sudoku through Safari. Confirm the Sudoku label and rose grid icon on the Home Screen. Launch it and verify the standalone view.
+- [ ] Add Sudoku through Safari. Confirm the Sudoku label and orange grid icon on the Home Screen. Launch it and verify the standalone view.
 - [ ] Wait for offline readiness and sync. Start a puzzle, enter a digit, and confirm it appears on another device through the same private origin.
 - [ ] Turn on Airplane Mode and verify Wi-Fi is off. Close the standalone app from the App Switcher and reopen it. Resume the puzzle, enter a digit, then close and reopen again. Confirm the digit and pending status remain. Start another puzzle offline and verify the generator works.
 - [ ] Restore the network and Tailscale and bring Sudoku to the foreground. Wait for **Synced** and verify the latest puzzle on the second device.
